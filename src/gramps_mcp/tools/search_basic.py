@@ -52,6 +52,15 @@ from ..models.parameters.source_params import SourceSearchParams
 logger = logging.getLogger(__name__)
 
 
+def _validate_params(arguments, param_class):
+    """Validate parameters - skip if already a validated Pydantic model."""
+    from pydantic import BaseModel
+
+    if isinstance(arguments, BaseModel):
+        return arguments
+    return param_class(**arguments)
+
+
 def with_client(func: Callable) -> Callable:
     """
     Decorator that provides a GrampsWebAPIClient instance and handles cleanup.
@@ -366,11 +375,19 @@ async def find_note_tool(client, arguments: Dict) -> List[TextContent]:
     )
 
 
-async def find_type_tool(arguments: Dict) -> List[TextContent]:
+async def find_type_tool(arguments) -> List[TextContent]:
     """Universal type-based search tool."""
-    entity_type = arguments.get("type")
-    gql = arguments.get("gql")
-    max_results = arguments.get("max_results", 20)
+    from pydantic import BaseModel
+
+    # Handle both dict and BaseModel inputs
+    if isinstance(arguments, BaseModel):
+        entity_type = arguments.type
+        gql = arguments.gql
+        max_results = getattr(arguments, "max_results", 20)
+    else:
+        entity_type = arguments.get("type")
+        gql = arguments.get("gql")
+        max_results = arguments.get("max_results", 20)
 
     # Get the string value from the enum if needed
     entity_type_str = (
@@ -391,13 +408,33 @@ async def find_type_tool(arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_anything_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_anything_tool(client, arguments) -> List[TextContent]:
     """
     Full-text search across all entity types.
     """
     try:
-        # Validate parameters
-        params = SearchParams(**arguments)
+        from pydantic import BaseModel
+        from ..models.parameters.simple_params import SimpleSearchParams
+
+        # Handle SimpleSearchParams (from FastMCP) or dict (from stdio)
+        if isinstance(arguments, SimpleSearchParams):
+            # Convert SimpleSearchParams to SearchParams
+            params = SearchParams(
+                query=arguments.query,
+                pagesize=arguments.max_results
+            )
+        elif isinstance(arguments, BaseModel):
+            # Other BaseModel - try to extract query
+            params = SearchParams(
+                query=getattr(arguments, "query", ""),
+                pagesize=getattr(arguments, "max_results", 20)
+            )
+        else:
+            # Dict from stdio transport
+            params = SearchParams(
+                query=arguments.get("query", ""),
+                pagesize=arguments.get("max_results", 20)
+            )
 
         # Get tree_id from settings
         settings = get_settings()
