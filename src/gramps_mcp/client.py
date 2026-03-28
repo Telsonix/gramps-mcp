@@ -215,6 +215,8 @@ class GrampsWebAPIClient:
             GrampsAPIError: If the API call fails
             ValueError: If parameters are invalid for the given API call
         """
+        logger.debug(f"[MAKE_API_CALL] {api_call.name} | Params: {params} | URL params: {url_params}")
+        
         # Validate parameters using the mapped parameter model
         validated_params = None
         if params is not None:
@@ -326,6 +328,13 @@ class GrampsWebAPIClient:
                         else:
                             merged_data[key] = value
                     json_data = merged_data
+
+        # Log the API call details
+        logger.info(
+            f"[API CALL] {api_call.method} {api_call.endpoint} | "
+            f"Query params: {request_params} | "
+            f"JSON data: {json_data}"
+        )
 
         # Make the API request
         return await self._make_request(
