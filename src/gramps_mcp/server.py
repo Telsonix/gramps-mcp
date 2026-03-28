@@ -38,7 +38,7 @@ from pydantic import BaseModel, Field
 from .models.parameters.citation_params import CitationData
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.family_params import FamilySaveParams
-from .models.parameters.media_params import MediaSaveParams
+from .models.parameters.media_params import MediaSaveParams, MediaFileUploadParams, MediaFileUpdateParams, MediaGetParams
 from .models.parameters.note_params import NoteSaveParams
 from .models.parameters.people_params import PersonData
 from .models.parameters.place_params import PlaceSaveParams
@@ -57,7 +57,7 @@ from .models.parameters.tag_params import TagSaveParams, TagSearchParams
 from .models.parameters.living_params import LivingParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.timeline_params import PeopleTimelineParams, FamiliesTimelineParams
-from .models.parameters.media_params import MediaFileUploadParams, MediaFileUpdateParams
+from .models.parameters.media_params import MediaFileUploadParams, MediaFileUpdateParams, MediaGetParams
 from .models.parameters.event_params import EventSpanParams
 
 # Import all tool functions
@@ -338,7 +338,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # Media File Tools
     "get_media_file": {
         "description": "Get information about a media file (metadata and download URL)",
-        "schema": DeleteParams,
+        "schema": MediaGetParams,
         "handler": get_media_file_tool,
     },
     "upload_media_file": {

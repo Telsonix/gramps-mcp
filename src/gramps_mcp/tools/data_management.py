@@ -866,26 +866,52 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
     Note: This returns file metadata. The actual file can be accessed
     via the Gramps Web UI or API directly.
     """
-    from ..models.parameters.delete_params import DeleteParams
+    from ..models.parameters.media_params import MediaGetParams
 
     try:
-        params = _validate_params(arguments, DeleteParams)
+        params = _validate_params(arguments, MediaGetParams)
         settings = get_settings()
         tree_id = settings.gramps_tree_id
 
+        handle = params.handle
+        gramps_id = params.gramps_id
+
+        if not handle and not gramps_id:
+            return [TextContent(type="text", text="Error: provide handle or gramps_id")]
+
         client = GrampsWebAPIClient()
         try:
+            # Resolve gramps_id to internal handle if handle not provided
+            if not handle and gramps_id:
+                media_list = await client.make_api_call(
+                    api_call=ApiCalls.GET_MEDIA,
+                    params=None,
+                    tree_id=tree_id,
+                )
+                if isinstance(media_list, list):
+                    for item in media_list:
+                        if item.get("gramps_id") == gramps_id:
+                            handle = item.get("handle")
+                            break
+                if not handle:
+                    return [
+                        TextContent(
+                            type="text",
+                            text=f"Media not found for gramps_id: {gramps_id}",
+                        )
+                    ]
+
             # First get media metadata
             media_info = await client.make_api_call(
                 api_call=ApiCalls.GET_MEDIA_ITEM,
                 params=None,
                 tree_id=tree_id,
-                handle=params.handle,
+                handle=handle,
             )
 
             if not media_info:
                 return [
-                    TextContent(type="text", text=f"Media not found: {params.handle}")
+                    TextContent(type="text", text=f"Media not found: {handle}")
                 ]
 
             # Format response
@@ -899,13 +925,13 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
             result += f"**Description:** {desc}\n"
             result += f"**MIME Type:** {mime}\n"
             result += f"**Path:** {path}\n"
-            result += f"**Handle:** `{params.handle}`\n"
+            result += f"**Handle:** `{handle}`\n"
             if checksum:
                 result += f"**Checksum:** {checksum}\n"
 
             # Provide download URL hint
             api_url = settings.gramps_api_url
-            result += f"\n**File URL:** `{api_url}/api/trees/{tree_id}/media/{params.handle}/file`\n"
+            result += f"\n**File URL:** `{api_url}/api/trees/{tree_id}/media/{handle}/file`\n"
 
             return [TextContent(type="text", text=result)]
 
