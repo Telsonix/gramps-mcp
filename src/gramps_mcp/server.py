@@ -546,11 +546,18 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # ========================================================================
     "get_media_file": {
         "description": (
-            "Get metadata about a media file (size, type, path). "
+            "Get metadata about a media file, with optional file content download. "
             "REQUIRED: Either handle or gramps_id (e.g. 'O0100'), not both. "
-            "Returns file metadata and URL for local download. "
-            "Use after find_type(type='media') or find_anything to get file info. "
-            "Use this to research what media exists; use upload_media_file to add new media."
+            "OPTIONAL: include_content (default false) — if true, downloads the actual file "
+            "and includes it as base64-encoded content. "
+            "max_file_size (default 50MB) — skip download if file exceeds this limit. "
+            "Set to -1 for no limit (caution: large files increase response size). "
+            "Returns: file description, MIME type, path, handle, checksum, and authenticated URL. "
+            "✅ Use include_content=true to get the file directly without needing auth tokens — "
+            "perfect for AI agents! "
+            "For images, also returns displayable data URI. "
+            "Example: get_media_file(gramps_id='O0100', include_content=true, max_file_size=104857600) "
+            "to allow up to 100MB files."
         ),
         "schema": MediaGetParams,
         "handler": get_media_file_tool,
