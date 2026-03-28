@@ -25,9 +25,9 @@ API calls supported in this category:
 - DELETE_TAG: Delete the tag
 """
 
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TagSearchParams(BaseModel):
@@ -37,6 +37,36 @@ class TagSearchParams(BaseModel):
     Note: This endpoint does NOT support gramps_id, gql, backlinks, extend, profile.
     Only the fields below are valid.
     """
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def coerce_page(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce page to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("pagesize", mode="before")
+    @classmethod
+    def coerce_pagesize(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce pagesize to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("strip", mode="before")
+    @classmethod
+    def coerce_strip(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce strip to bool."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v) if v is not None else None
 
     page: Optional[int] = Field(None, ge=0, description="Page number for pagination")
     pagesize: Optional[int] = Field(None, gt=0, description="Number of records per page")
