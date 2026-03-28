@@ -57,7 +57,6 @@ from .models.parameters.tag_params import TagSaveParams, TagSearchParams
 from .models.parameters.living_params import LivingParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.timeline_params import PeopleTimelineParams, FamiliesTimelineParams
-from .models.parameters.media_params import MediaFileUploadParams, MediaFileUpdateParams, MediaGetParams
 from .models.parameters.event_params import EventSpanParams
 
 # Import all tool functions
