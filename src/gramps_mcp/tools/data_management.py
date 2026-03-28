@@ -691,9 +691,9 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
     """
     Get information about a media file (metadata and download URL).
 
-    Note: This returns file metadata. The actual file can be accessed
-    via the Gramps Web UI or API directly.
+    Can optionally download and include the actual file content (as base64).
     """
+    import base64
     from ..models.parameters.media_params import MediaGetParams
 
     try:
@@ -703,6 +703,7 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
 
         handle = params.handle
         gramps_id = params.gramps_id
+        include_content = params.include_content or False
 
         if not handle and not gramps_id:
             return [TextContent(type="text", text="Error: provide handle or gramps_id")]
@@ -757,9 +758,87 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
             if checksum:
                 result += f"**Checksum:** {checksum}\n"
 
-            # Provide download URL hint
-            api_url = settings.gramps_api_url
-            result += f"\n**File URL:** `{api_url}/api/trees/{tree_id}/media/{handle}/file`\n"
+            # Provide download URL with proper construction
+            # Build URL using the same logic as the client to avoid double slashes
+            from urllib.parse import urljoin
+            api_url = str(settings.gramps_api_url).rstrip("/")
+            if not api_url.endswith("/api"):
+                api_url += "/api"
+            api_url_base = api_url.rstrip("/") + "/"
+            file_url = urljoin(api_url_base, f"trees/{tree_id}/media/{handle}/file")
+            
+            result += f"\n**File URL:** `{file_url}`\n"
+
+            # If include_content is requested, fetch and include the actual file
+            if include_content:
+                result += f"\n### File Content (Embedded)\n\n"
+                max_size = params.max_file_size
+                
+                try:
+                    # Fetch the file content using the authenticated client
+                    file_content = await client.make_api_call(
+                        api_call=ApiCalls.GET_MEDIA_FILE,
+                        params=None,
+                        tree_id=tree_id,
+                        handle=handle,
+                    )
+
+                    if file_content:
+                        # Convert to base64
+                        if isinstance(file_content, bytes):
+                            file_bytes = file_content
+                        else:
+                            file_bytes = file_content.read() if hasattr(file_content, 'read') else str(file_content).encode()
+                        
+                        actual_size = len(file_bytes)
+                        
+                        # Check file size limit
+                        if max_size > 0 and actual_size > max_size:
+                            size_mb = actual_size / (1024 * 1024)
+                            limit_mb = max_size / (1024 * 1024)
+                            result += f"⚠️ **File Too Large for Inline Download**\n\n"
+                            result += f"- **File size:** {size_mb:.2f} MB\n"
+                            result += f"- **Size limit:** {limit_mb:.2f} MB\n\n"
+                            result += f"**Options to download:**\n"
+                            result += f"1. Use curl with credentials: curl -H 'Authorization: Bearer <JWT>' {file_url} -o filename\n"
+                            result += f"2. Increase limit: Call with max_file_size={int(actual_size * 1.1)}\n"
+                            result += f"3. Use Gramps Web UI: http://192.168.1.2:5002\n"
+                        else:
+                            # File size OK, encode and prepare for display
+                            base64_content = base64.b64encode(file_bytes).decode('utf-8')
+                            
+                            # Check if it's an image for data URI
+                            is_image = mime.lower().startswith('image/') and mime.lower() in [
+                                'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'
+                            ]
+                            
+                            if is_image:
+                                data_uri = f"data:{mime};base64,{base64_content}"
+                                result += f"**Displayable Image:**\n\n"
+                                result += f"![{gramps_id}]({data_uri})\n\n"
+                                result += f"**Base64 Content (first 200 chars):**\n\n"
+                                result += f"```\n"
+                                result += f"{base64_content[:200]}...\n"
+                                result += f"```\n\n"
+                            else:
+                                result += f"**Base64 Content (first 500 chars):**\n\n"
+                                result += f"```\n"
+                                result += f"{base64_content[:500]}...\n"
+                                result += f"```\n\n"
+                                result += f"**Full Base64:** {base64_content}\n\n"
+                            
+                            result += f"**Content Size:** {actual_size:,} bytes\n\n"
+                except Exception as e:
+                    result += f"⚠️ Failed to fetch file content: {str(e)}\n\n"
+                    logger.debug(f"Failed to fetch media file content: {e}")
+            
+            result += f"\n**ℹ️ Note:** File URL requires authentication via JWT token.\n"
+            result += f"To download manually via curl:\n"
+            result += f"```bash\n"
+            result += f"curl -H \"Authorization: Bearer <JWT_TOKEN>\" \\\n"
+            result += f"  \"{file_url}\" \\\n"
+            result += f"  -o filename.jpg\n"
+            result += f"```\n"
 
             return [TextContent(type="text", text=result)]
 

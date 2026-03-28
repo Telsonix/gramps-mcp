@@ -29,9 +29,9 @@ API calls supported in this category:
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from .base_params import BaseDataModel
+from .base_params import BaseDataModel, BaseGetMultipleParams
 
 _GENDER_MAP = {
     "female": 0,
@@ -142,8 +142,11 @@ class PersonData(BaseDataModel):
     )
 
 
-class PersonTimelineParams(BaseModel):
-    """Parameters for getting a person's timeline from Gramps API."""
+class PersonTimelineParams(BaseGetMultipleParams):
+    """Parameters for getting a person's timeline from Gramps API.
+    
+    Inherits pagination parameters (page, pagesize, sort) from BaseGetMultipleParams.
+    """
 
     dates: Optional[str] = Field(
         None,
@@ -191,8 +194,6 @@ class PersonTimelineParams(BaseModel):
     omit_anchor: Optional[bool] = Field(
         None, description="Omit person info for events pertaining to that person"
     )
-    page: Optional[int] = Field(None, ge=0, description="Page number for pagination")
-    pagesize: Optional[int] = Field(None, ge=1, description="Number of items per page")
 
 
 class PersonDnaMatchesParams(BaseModel):

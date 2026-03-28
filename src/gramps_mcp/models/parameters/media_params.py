@@ -50,6 +50,24 @@ class MediaGetParams(BaseModel):
     gramps_id: Optional[str] = Field(
         None, description="Gramps ID (e.g. O0001) - alternative to handle"
     )
+    include_content: Optional[bool] = Field(
+        False,
+        description=(
+            "If true, download the actual file content and include it as base64 "
+            "(for images, also include data URI for display). "
+            "Only use when you need to process/display the file. "
+            "WARNING: Large files will increase response size significantly."
+        ),
+    )
+    max_file_size: Optional[int] = Field(
+        52428800,  # 50MB default
+        description=(
+            "Maximum file size in bytes to download when include_content=true. "
+            "Default is 50MB (52428800 bytes). Files larger than this limit "
+            "will not be downloaded to avoid response bloat. "
+            "Set to -1 for no limit (use with caution!)."
+        ),
+    )
 
 
 class MediaFileParams(BaseModel):
