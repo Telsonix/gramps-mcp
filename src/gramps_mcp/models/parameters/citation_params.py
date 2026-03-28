@@ -25,11 +25,12 @@ API calls supported in this category:
 - DELETE_CITATION: Delete the citation
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .base_params import BaseDataModel, BaseGetMultipleParams
+from .event_params import _coerce_date
 
 
 class GetCitationsParams(BaseGetMultipleParams):
@@ -43,14 +44,18 @@ class GetCitationsParams(BaseGetMultipleParams):
 class CitationData(BaseDataModel):
     """Model for creating or updating a citation via POST/PUT endpoints."""
 
-    date: Optional[Dict[str, Any]] = Field(
+    date: Optional[Union[str, Dict[str, Any]]] = Field(
         None,
         description=(
-            "Date object with dateval array [day, month, year, False], "
-            "quality (0=regular, 1=estimated, 2=calculated), and modifier "
-            "(0=regular, 1=before, 2=after, 3=about, 4=range, 5=span, "
-            "6=textonly, 7=from, 8=to)"
+            "Citation date. Plain string ('1850', '1850-06', '1850-06-15') "
+            "or full Gramps Date object."
         ),
     )
     page: Optional[str] = Field(None, description="Page or location within the source")
     source_handle: str = Field(..., description="Handle of the source being cited")
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def coerce_date(cls, v: Any) -> Optional[Dict[str, Any]]:
+        """Accept plain date strings and convert to Gramps Date object."""
+        return _coerce_date(v)

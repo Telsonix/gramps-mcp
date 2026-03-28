@@ -25,9 +25,9 @@ API calls supported in this category:
 - DELETE_PLACE: Delete the place
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .base_params import BaseGetMultipleParams, BaseGetSingleParams
 
@@ -53,12 +53,24 @@ class PlaceSaveParams(BaseModel):
     gramps_id: Optional[str] = Field(
         None, description="Alternate user managed identifier"
     )
-    name: Optional[dict] = Field(
-        None, description="Place name object with 'value' field"
+    name: Optional[Union[str, Dict[str, Any]]] = Field(
+        None,
+        description=(
+            "Place name. Can be a plain string ('London') or a Gramps name object "
+            "{\"value\": \"London\"}. Plain strings are automatically converted."
+        ),
     )
     code: Optional[str] = Field(None, description="Place code")
     alt_loc: Optional[List[dict]] = Field(None, description="Alternative locations")
-    place_type: str = Field(..., description="Place type")
+    place_type: str = Field(
+        ...,
+        description=(
+            "Place type string, e.g. 'City', 'Country', 'County', 'State', "
+            "'Province', 'Region', 'Parish', 'Town', 'Village', 'Address', "
+            "'District', 'Borough', 'Municipality', 'Hamlet', 'Farm', "
+            "'Unknown'. Use get_types tool for full list."
+        ),
+    )
     placeref_list: Optional[List[dict]] = Field(
         None, description="List of place references"
     )
@@ -73,3 +85,11 @@ class PlaceSaveParams(BaseModel):
     note_list: Optional[List[str]] = Field(None, description="List of note handles")
     tag_list: Optional[List[str]] = Field(None, description="List of tag handles")
     private: Optional[bool] = Field(None, description="Mark as private")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def coerce_name(cls, v: Any) -> Optional[Dict[str, Any]]:
+        """Accept a plain place name string and wrap it in the Gramps name object."""
+        if isinstance(v, str):
+            return {"value": v}
+        return v

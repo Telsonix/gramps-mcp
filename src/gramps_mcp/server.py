@@ -163,51 +163,95 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # Data Management Tools
     "create_person": {
         "description": (
-            "Create or update person information including family links "
-            "and event associations"
+            "Create or update a person record. "
+            "primary_name accepts a plain string ('John Smith') — last word becomes "
+            "surname — or a full Name object. "
+            "gender accepts 'Male', 'Female', 'Unknown' (or integers 1/0/2). "
+            "Example: primary_name='Mary O\'Connor', gender='Female'."
         ),
         "schema": PersonData,
         "handler": create_person_tool,
     },
     "create_family": {
-        "description": "Create or update family unit including member relationships",
+        "description": (
+            "Create or update a family unit. "
+            "Provide father_handle and/or mother_handle (internal handles, not Gramps IDs). "
+            "Use child_handles=['handle1','handle2'] for children — automatically "
+            "converted to child_ref_list. Omit handle to create new."
+        ),
         "schema": FamilySaveParams,
         "handler": create_family_tool,
     },
     "create_event": {
         "description": (
-            "Create or update life event including person/place associations"
+            "Create or update a life event. "
+            "type is a string: 'Birth', 'Death', 'Marriage', 'Burial', etc. "
+            "date accepts a plain string ('1850', '1850-06', '1850-06-15') "
+            "or a full Gramps Date object. "
+            "place is the internal place handle (not Gramps ID). "
+            "citation_list is optional."
         ),
         "schema": EventSaveParams,
         "handler": create_event_tool,
     },
     "create_place": {
-        "description": "Create or update geographic location",
+        "description": (
+            "Create or update a geographic location. "
+            "name accepts a plain string ('London') or {\"value\": \"London\"}. "
+            "place_type is a string: 'City', 'Country', 'County', 'State', "
+            "'Province', 'Region', 'Parish', 'Town', 'Village', etc. "
+            "Use get_types tool for the full list."
+        ),
         "schema": PlaceSaveParams,
         "handler": create_place_tool,
     },
     "create_source": {
-        "description": "Create or update source document",
+        "description": (
+            "Create or update a source document (book, website, archive record, etc.). "
+            "Required: title. Optional: author, pubinfo (publication info), "
+            "reporef_list (list of repository references)."
+        ),
         "schema": SourceSaveParams,
         "handler": create_source_tool,
     },
     "create_citation": {
-        "description": "Create or update citation including object associations",
+        "description": (
+            "Create or update a citation linking a source to a claim. "
+            "Required: source_handle (internal handle of the source). "
+            "Optional: page (page/location in source), "
+            "date as plain string ('1850') or Gramps Date object."
+        ),
         "schema": CitationData,
         "handler": create_citation_tool,
     },
     "create_note": {
-        "description": "Create or update textual note including object associations",
+        "description": (
+            "Create or update a textual note. "
+            "Required: text (plain string content), type (note type string, "
+            "e.g. 'General', 'Research', 'Source', 'To Do', 'Citation'). "
+            "text is automatically wrapped in StyledText format for the API."
+        ),
         "schema": NoteSaveParams,
         "handler": create_note_tool,
     },
     "create_media": {
-        "description": "Create or update media files including object associations",
+        "description": (
+            "Create or update a media object record (metadata only — "
+            "use upload_media_file to also attach a file). "
+            "Required: desc (description string). "
+            "Optional: path (file path or URL), mime (MIME type e.g. 'image/jpeg'), "
+            "date as plain string or Gramps Date object."
+        ),
         "schema": MediaSaveParams,
         "handler": create_media_tool,
     },
     "create_repository": {
-        "description": "Create or update repository information",
+        "description": (
+            "Create or update a repository (archive, library, church, etc.). "
+            "Required: name (string), type (string e.g. 'Archive', 'Library', "
+            "'Church', 'National Archive', 'Web', 'Unknown'). "
+            "Optional: urls list."
+        ),
         "schema": RepositoryData,
         "handler": create_repository_tool,
     },
