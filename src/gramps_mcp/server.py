@@ -145,9 +145,17 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Search for any genealogy record type using Gramps Query Language (GQL). "
             "REQUIRED: type (person/family/event/place/source/citation/media/repository/note), "
             "gql (GQL filter expression). OPTIONAL: max_results (default 20). "
-            "Example: type='person', gql='surname=\"Smith\" AND birth_year > 1800'. "
+            "CRITICAL GQL SYNTAX - properties are nested paths, NOT top-level fields: "
+            "- Surname search: primary_name.surname_list[0].surname = \"Smith\" "
+            "- First name search: primary_name.first_name ~ \"John\" "
+            "- Gender (0=female, 1=male, 2=unknown): gender = 1 "
+            "- Birth year: birth.get_event.date.dateval[2] > 1800 "
+            "- Private records: private "
+            "- Has media: media_list "
+            "- Family with many children: child_ref_list.length > 5 "
+            "- Combine with 'and'/'or': primary_name.surname_list[0].surname = \"Smith\" and gender = 1 "
             "Returns list of matching records with handles and gramps_ids. "
-            "Read gql://documentation resource first to understand GQL syntax."
+            "Read gql://documentation resource before constructing complex queries."
         ),
         "schema": SimpleFindParams,
         "handler": find_type_tool,
