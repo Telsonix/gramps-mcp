@@ -1,7 +1,7 @@
 swagger: "2.0"
 info:
   title: "Gramps Web API"
-  version: "3.2.0"
+  version: "3.7.2"
   description: >
     The Gramps Web API is a REST API that provides access to family tree databases generated and maintained with Gramps, a popular Open Source genealogical research software package.
 
@@ -169,6 +169,207 @@ paths:
 
 
 ##############################################################################
+# Endpoint - OIDC Authentication
+##############################################################################
+
+  /oidc/config:
+    get:
+      tags:
+      - authentication
+      summary: "Get OIDC configuration and available providers."
+      operationId: getOIDCConfig
+      responses:
+        200:
+          description: "OK: Successful operation."
+          schema:
+            $ref: "#/definitions/OIDCConfig"
+
+  /oidc/login/:
+    get:
+      tags:
+      - authentication
+      summary: "Initiate OIDC login flow."
+      operationId: oidcLogin
+      parameters:
+      - name: provider
+        in: query
+        required: true
+        type: string
+        description: "The OIDC provider ID (e.g., google, microsoft, github, custom)"
+        example: "google"
+      responses:
+        302:
+          description: "Redirect: Redirects to OIDC provider for authentication."
+        400:
+          description: "Bad Request: Invalid or unavailable provider."
+        405:
+          description: "Method Not Allowed: OIDC authentication is not enabled."
+        500:
+          description: "Internal Server Error: OIDC client not properly initialized."
+
+  /oidc/callback/:
+    get:
+      tags:
+      - authentication
+      summary: "Handle OIDC callback and create JWT tokens (legacy query parameter format)."
+      description: "Legacy endpoint for backwards compatibility. New deployments should use /oidc/callback/{provider_id} instead."
+      operationId: oidcCallback
+      parameters:
+      - name: provider
+        in: query
+        required: true
+        type: string
+        description: "The OIDC provider ID"
+        example: "google"
+      - name: code
+        in: query
+        required: false
+        type: string
+        description: "Authorization code from OIDC provider"
+      - name: state
+        in: query
+        required: false
+        type: string
+        description: "State parameter from OIDC provider"
+      - name: session_state
+        in: query
+        required: false
+        type: string
+        description: "Session state parameter from OIDC provider"
+      - name: error
+        in: query
+        required: false
+        type: string
+        description: "Error parameter from OIDC provider"
+      - name: error_description
+        in: query
+        required: false
+        type: string
+        description: "Error description from OIDC provider"
+      responses:
+        302:
+          description: "Redirect: Redirects to frontend with JWT tokens."
+        400:
+          description: "Bad Request: Invalid provider or authentication error."
+        405:
+          description: "Method Not Allowed: OIDC authentication is not enabled."
+        500:
+          description: "Internal Server Error: OIDC client error."
+
+  /oidc/callback/{provider_id}:
+    get:
+      tags:
+      - authentication
+      summary: "Handle OIDC callback and create JWT tokens (path parameter format)."
+      description: "Path-based endpoint compatible with providers that disallow query parameters in redirect URIs. This is the preferred format for new deployments."
+      operationId: oidcCallbackProvider
+      parameters:
+      - name: provider_id
+        in: path
+        required: true
+        type: string
+        description: "The OIDC provider ID (e.g., 'google', 'microsoft', 'github')"
+        example: "microsoft"
+      - name: code
+        in: query
+        required: false
+        type: string
+        description: "Authorization code from OIDC provider"
+      - name: state
+        in: query
+        required: false
+        type: string
+        description: "State parameter from OIDC provider"
+      - name: session_state
+        in: query
+        required: false
+        type: string
+        description: "Session state parameter from OIDC provider"
+      - name: error
+        in: query
+        required: false
+        type: string
+        description: "Error parameter from OIDC provider"
+      - name: error_description
+        in: query
+        required: false
+        type: string
+        description: "Error description from OIDC provider"
+      responses:
+        302:
+          description: "Redirect: Redirects to frontend with JWT tokens."
+        400:
+          description: "Bad Request: Invalid provider or authentication error."
+        405:
+          description: "Method Not Allowed: OIDC authentication is not enabled."
+        500:
+          description: "Internal Server Error: OIDC client error."
+
+  /oidc/logout/:
+    get:
+      tags:
+      - authentication
+      summary: "Get OIDC logout URL for a provider."
+      operationId: oidcLogout
+      parameters:
+      - name: provider
+        in: query
+        required: true
+        type: string
+        description: "The OIDC provider ID"
+        example: "google"
+      - name: id_token
+        in: query
+        required: false
+        type: string
+        description: "ID token to use as id_token_hint"
+      - name: post_logout_redirect_uri
+        in: query
+        required: false
+        type: string
+        description: "URI to redirect to after logout"
+      responses:
+        200:
+          description: "OK: Returns logout URL or null if provider doesn't support logout."
+          schema:
+            type: object
+            properties:
+              logout_url:
+                type: string
+                description: "The end_session_endpoint URL with parameters, or null if not available"
+        400:
+          description: "Bad Request: Invalid or unavailable provider."
+        405:
+          description: "Method Not Allowed: OIDC authentication is not enabled."
+        500:
+          description: "Internal Server Error: OIDC client error."
+
+  /oidc/backchannel-logout/:
+    post:
+      tags:
+      - authentication
+      summary: "Handle OIDC backchannel logout request from provider."
+      operationId: oidcBackchannelLogout
+      consumes:
+      - application/x-www-form-urlencoded
+      parameters:
+      - name: logout_token
+        in: formData
+        required: true
+        type: string
+        description: "The logout token JWT from the OIDC provider"
+      responses:
+        200:
+          description: "OK: Logout request processed successfully."
+        400:
+          description: "Bad Request: Invalid or missing logout_token."
+        405:
+          description: "Method Not Allowed: OIDC authentication is not enabled."
+        500:
+          description: "Internal Server Error: Error processing logout request."
+
+
+##############################################################################
 # Endpoint - Users
 ##############################################################################
 
@@ -183,6 +384,29 @@ paths:
       responses:
         200:
           description: "OK: Successful operation."
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  description: "The user's username."
+                  type: string
+                email:
+                  description: "The user's e-mail address."
+                  type: string
+                full_name:
+                  description: "The user's full name."
+                  type: string
+                role:
+                  description: "The user's role ID."
+                  type: number
+                tree:
+                  description: "The user's tree."
+                  type: string
+                account_source:
+                  description: "The source of the user account (e.g., 'Local' or OIDC provider name)."
+                  type: string
         401:
           description: "Unauthorized: Missing authorization header."
         422:
@@ -244,6 +468,27 @@ paths:
       responses:
         200:
           description: "OK: Successful operation."
+          schema:
+            type: object
+            properties:
+              name:
+                description: "The user's username."
+                type: string
+              email:
+                description: "The user's e-mail address."
+                type: string
+              full_name:
+                description: "The user's full name."
+                type: string
+              role:
+                description: "The user's role ID."
+                type: number
+              tree:
+                description: "The user's tree."
+                type: string
+              account_source:
+                description: "The source of the user account (e.g., 'Local' or OIDC provider name)."
+                type: string
         401:
           description: "Unauthorized: Missing authorization header."
         403:
@@ -271,18 +516,30 @@ paths:
             full_name:
               description: "The new user's full name."
               type: string
+            name_new:
+              description: "The new username (for renaming the user)."
+              type: string
+              minLength: 1
+              pattern: '^(?!-$)(?!_$).*$'
             role:
               description: "An integer user role ID."
               type: number
+            tree:
+              description: "The tree ID the user belongs to."
+              type: string
       responses:
         200:
           description: "OK: Successful operation."
+        400:
+          description: "Bad Request: Invalid username (empty or reserved)."
         401:
           description: "Unauthorized: Missing authorization header."
         403:
           description: "Unauthorized: insufficient permissions."
         404:
           description: "Not found: User does not exist."
+        409:
+          description: "Conflict: Username already exists."
         422:
           description: "Unprocessable Entity: Invalid token."
     post:
@@ -874,6 +1131,14 @@ paths:
             ratings | Returns citation count and highest confidence rating for events
             families | Returns family information with parents, children, and key relationship between parents
             references | Returns information about objects that refer to the person
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the profile.name_display key
+          Intended for setting the full name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -1006,6 +1271,14 @@ paths:
             ratings | Returns citation count and highest confidence rating for events
             families | Returns family information with parents, children, and key relationship between parents
             references | Returns information about objects that refer to the person
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the profile.name_display key
+          Intended for setting the full name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -1313,6 +1586,47 @@ paths:
           description: "Unprocessable Entity: Invalid or bad parameter provided."
 
 
+  /people/{handle}/dna/ydna:
+    get:
+      tags:
+        - people
+      summary: Get Y-DNA clade lineage for a person
+      description: >
+        Returns the Y-DNA clade lineage for the person with the given handle, including clade age and confidence intervals if available.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          type: string
+          description: The handle of the person.
+        - name: raw
+          in: query
+          required: false
+          type: boolean
+          description: If true, include raw data in the response.
+      responses:
+        200:
+          description: Successful response with clade lineage information.
+          schema:
+            type: object
+            properties:
+              clade_lineage:
+                type: array
+                items:
+                  $ref: '#/definitions/CladeInfo'
+              raw_data:
+                description: The raw Y chromosome SNP data in a format compatible with the yclade library.
+                type: string
+                example: M215+, BY61636-, FTF15749-, TY15744-
+        401:
+          description: "Unauthorized: Missing authorization header."
+        404:
+          description: "Person not found."
+        422:
+          description: "Unprocessable Entity: Invalid or bad parameter provided."
+
+
+
 ##############################################################################
 # Endpoint - Families
 ##############################################################################
@@ -1474,6 +1788,14 @@ paths:
             events | Returns family event list with name, date and location
             ratings | Returns citation count and highest confidence rating for events
             references | Returns information about objects that refer to the family
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -1603,6 +1925,14 @@ paths:
             events | Returns family event list with name, date and location
             ratings | Returns citation count and highest confidence rating for events
             references | Returns information about objects that refer to the family
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -1944,6 +2274,14 @@ paths:
             ratings | Returns citation count and highest confidence rating for events
             participants | Returns information about the event participants
             references | Returns information about objects that refer to the family
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -2061,6 +2399,14 @@ paths:
             events | Returns event name, date and location
             ratings | Returns citation count and highest confidence rating for events
             references | Returns information about objects that refer to the event
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -2656,6 +3002,14 @@ paths:
             ------ | --------
             all | Returns all information
             references | Returns information about objects that refer to the place
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -2765,6 +3119,14 @@ paths:
             ------ | --------
             all | Returns all information
             references | Returns information about objects that refer to the place
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -3562,6 +3924,14 @@ paths:
             ------ | --------
             all | Returns all information
             references | Returns information about objects that refer to the place
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       - name: filemissing
         in: query
         required: false
@@ -3673,6 +4043,14 @@ paths:
             ------ | --------
             all | Returns all information
             references | Returns information about objects that refer to the place
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       responses:
         200:
           description: "OK: Successful operation."
@@ -4827,6 +5205,114 @@ paths:
           description: "Bad Request: Malformed request could not be parsed."
         401:
           description: "Unauthorized: Missing authorization header."
+        422:
+          description: "Unprocessable Entity: Invalid or bad parameter provided."
+
+  /transactions/history/{transaction_id}/undo:
+    get:
+      tags:
+      - transactions
+      summary: "Check if a specific database transaction can be undone without conflicts."
+      operationId: checkUndoTransaction
+      security:
+        - Bearer: []
+      parameters:
+      - name: transaction_id
+        in: path
+        required: true
+        type: integer
+        description: "The ID of the transaction to check for undo feasibility."
+      responses:
+        200:
+          description: "OK: Undo feasibility check completed successfully."
+          schema:
+            type: object
+            properties:
+              transaction_id:
+                type: integer
+                description: "The ID of the transaction that was checked."
+              can_undo_without_force:
+                type: boolean
+                description: "Whether the transaction can be undone without using the force parameter."
+              total_changes:
+                type: integer
+                description: "Total number of changes in the transaction."
+              conflicts_count:
+                type: integer
+                description: "Number of conflicts that would prevent undo without force."
+              conflicts:
+                type: array
+                description: "List of specific conflicts found during the check."
+                items:
+                  type: object
+                  properties:
+                    change_index:
+                      type: integer
+                      description: "Index of the conflicting change within the transaction."
+                    object_class:
+                      type: string
+                      description: "Class of the conflicting object (e.g., 'Person', 'Family')."
+                    handle:
+                      type: string
+                      description: "Handle of the conflicting object."
+                    conflict_type:
+                      type: string
+                      description: "Type of conflict (e.g., 'object_changed', 'object_exists')."
+                    description:
+                      type: string
+                      description: "Human-readable description of the conflict."
+        400:
+          description: "Bad Request: Malformed request could not be parsed."
+        401:
+          description: "Unauthorized: Missing authorization header."
+        403:
+          description: "Forbidden: Insufficient permissions to check undo transactions."
+        404:
+          description: "Not Found: Transaction with the specified ID was not found."
+        422:
+          description: "Unprocessable Entity: Invalid or bad parameter provided."
+    post:
+      tags:
+      - transactions
+      summary: "Undo a specific database transaction using background processing."
+      operationId: undoTransaction
+      security:
+        - Bearer: []
+      parameters:
+      - name: transaction_id
+        in: path
+        required: true
+        type: integer
+        description: "The ID of the transaction to undo."
+      - name: force
+        in: query
+        required: false
+        type: boolean
+        description: "If true, force undoing the transaction even if objects have been modified since the original transaction."
+      responses:
+        200:
+          description: "OK: Transaction undo completed successfully."
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/Transaction"
+        202:
+          description: "Accepted: Transaction undo will be applied in the background."
+          schema:
+            type: object
+            properties:
+              task:
+                $ref: "#/definitions/TaskReference"
+        400:
+          description: "Bad Request: Malformed request could not be parsed."
+        401:
+          description: "Unauthorized: Missing authorization header."
+        403:
+          description: "Forbidden: Insufficient permissions to undo transactions."
+        404:
+          description: "Not Found: Transaction with the specified ID was not found."
+        409:
+          description: "Conflict: Objects have changed since the original transaction and force parameter was not used."
         422:
           description: "Unprocessable Entity: Invalid or bad parameter provided."
 
@@ -6137,6 +6623,14 @@ paths:
             span | Returns elapsed time span from union that formed the family and familial events
             events | Returns event list with name, date and location
             families | Returns family information with parents, children, and key relationship between parents
+      - name: name_format
+        in: query
+        required: false
+        type: string
+        description: >
+          Specifies the format for the values corresponding to the name_display key
+          Intended for setting the full person's name format including given name, surnames, etc. by the user
+          Refer to gramps.gen.display.name module for the format string syntax
       - name: semantic
         in: query
         required: false
@@ -6198,32 +6692,70 @@ paths:
 ##############################################################################
 
   /chat:
-    get:
+    post:
       tags:
       - chat
       summary: "Answer a chat prompt."
       operationId: completeChat
       security:
         - Bearer: []
+      consumes:
+        - application/json
       parameters:
-      - name: query
-        in: query
-        required: true
-        type: string
-        description: "The query prompt."
-      - name: history
-        in: query
-        required: false
-        type: string
-        description: >
-          An optional JSON object with a history of chat messages.
-          It should be an array of objects that have two string properties: `role` being one of `human` or `ai`, and `message` being the message content.
-        example: "[{\"role\":\"human\",\"message\":\"Hello AI!\"},{\"role\":\"ai\",\"message\":\"Hello Human!\"}]"
+        - name: background
+          in: query
+          required: false
+          type: boolean
+          default: false
+          description: "If true, the chat will be processed in the background and status 202 will be returned."
+        - name: verbose
+          in: query
+          required: false
+          type: boolean
+          default: false
+          description: "If true, the response will include detailed metadata about the agent's execution, including tool calls and usage statistics."
+        - in: body
+          name: source
+          description: The chat query and optional history
+          schema:
+            type: object
+            required:
+              - query
+            properties:
+              query:
+                type: string
+                description: "The query prompt."
+              history:
+                type: array
+                description: >
+                  An optional array of chat message objects with a history of the conversation.
+                  Each message object should have `role` (one of 'human', 'ai', 'system', 'assistant', or 'error') and `message` (the message content).
+                items:
+                  type: object
+                  properties:
+                    role:
+                      type: string
+                      description: "The role of the message sender."
+                    message:
+                      type: string
+                      description: "The message content."
+                example:
+                  - role: "human"
+                    message: "Hello AI!"
+                  - role: "ai"
+                    message: "Hello Human!"
       responses:
         200:
           description: "OK: Successful operation."
           schema:
             $ref: "#/definitions/ChatResponse"
+        202:
+          description: "Accepted: chat will be processed in the background."
+          schema:
+            type: object
+            properties:
+              task:
+                $ref: "#/definitions/TaskReference"
         401:
           description: "Unauthorized: Missing authorization header."
         403:
@@ -7425,6 +7957,66 @@ paths:
 definitions:
 
 ##############################################################################
+# Model - CladeAgeInfo
+##############################################################################
+
+  CladeAgeInfo:
+    type: object
+    properties:
+      formed:
+        type: number
+        format: float
+        description: How many years ago the clade was formed.
+        nullable: true
+        example: 4500
+      formed_confidence_interval:
+        type: array
+        items:
+          type: number
+          format: float
+        minItems: 2
+        maxItems: 2
+        description: 95% confidence interval for the formed age.
+        nullable: true
+      most_recent_common_ancestor:
+        type: number
+        format: float
+        description: How many years ago the most recent common ancestor was born.
+        nullable: true
+        example: 3800
+      most_recent_common_ancestor_confidence_interval:
+        type: array
+        items:
+          type: number
+          format: float
+        minItems: 2
+        maxItems: 2
+        description: 95% confidence interval for the most recent common ancestor age.
+        nullable: true
+
+##############################################################################
+# Model - CladeInfo
+##############################################################################
+
+  CladeInfo:
+    type: object
+    properties:
+      name:
+        type: string
+        description: The ID of the clade.
+        example: BY61636
+      age_info:
+        $ref: '#/definitions/CladeAgeInfo'
+        description: The age information for the clade.
+        nullable: true
+      score:
+        type: number
+        format: float
+        description: The score for the clade (optional).
+        nullable: true
+        example: 9.0
+
+##############################################################################
 # Model - Token
 ##############################################################################
 
@@ -7451,6 +8043,43 @@ definitions:
       access_token:
         description: Access token
         type: string
+
+  OIDCConfig:
+    type: object
+    properties:
+      enabled:
+        description: Whether OIDC authentication is enabled
+        type: boolean
+        example: true
+      providers:
+        description: List of available OIDC providers
+        type: array
+        items:
+          $ref: "#/definitions/OIDCProvider"
+      disable_local_auth:
+        description: Whether local username/password authentication is disabled
+        type: boolean
+        example: false
+      auto_redirect:
+        description: Whether to automatically redirect to OIDC when only one provider is configured
+        type: boolean
+        example: false
+
+  OIDCProvider:
+    type: object
+    properties:
+      id:
+        description: Provider identifier
+        type: string
+        example: "google"
+      name:
+        description: Provider display name
+        type: string
+        example: "Google"
+      login_url:
+        description: URL to initiate login with this provider
+        type: string
+        example: "https://api.example.com/oidc/login/?provider=google"
 
 ##############################################################################
 # Model - Date
@@ -7955,6 +8584,10 @@ definitions:
         description: "The unique identifier for a person."
         type: string
         example: "GNUJQCL9MD64AM56OH"
+      name_display:
+        description: "Preferred name of the person in a predefined display format"
+        type: string
+        example: "Warner, Mary Grace Elizabeth (Mary)"
       name_given:
         description: "Preferred given name of the person."
         type: string
@@ -8811,6 +9444,18 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/PlaceProfile"
+      direct_parent_places:
+        description: "A list of direct parent places with the corresponding dates."
+        type: array
+        items:
+          type: object
+          properties:
+            date_str:
+              description: "Date on which the parent place belongs to the place under view."
+              type: string
+              example: "1800 to 1950"
+            place:
+              $ref: "#/definitions/PlaceProfile"
       references:
         description: "References from other objects"
         type: object
@@ -10683,6 +11328,63 @@ definitions:
       response:
         type: string
         example: "I don't know."
+      metadata:
+        type: object
+        description: "Optional metadata about the agent's execution (included when verbose=true)."
+        properties:
+          run_id:
+            type: string
+            description: "Unique identifier for this agent run."
+            example: "abc123def456"
+          timestamp:
+            type: string
+            format: date-time
+            description: "ISO 8601 timestamp when the run occurred."
+            example: "2025-12-05T10:30:00Z"
+          usage:
+            type: object
+            description: "Token usage and request statistics."
+            properties:
+              requests:
+                type: integer
+                description: "Number of LLM requests made."
+                example: 2
+              input_tokens:
+                type: integer
+                description: "Number of input tokens used."
+                example: 1234
+              output_tokens:
+                type: integer
+                description: "Number of output tokens generated."
+                example: 567
+              total_tokens:
+                type: integer
+                description: "Total number of tokens used."
+                example: 1801
+              tool_calls:
+                type: integer
+                description: "Number of tool calls made."
+                example: 2
+          tools_used:
+            type: array
+            description: "List of tools called during execution."
+            items:
+              type: object
+              properties:
+                step:
+                  type: integer
+                  description: "Sequential step number of this tool call."
+                  example: 1
+                name:
+                  type: string
+                  description: "Name of the tool that was called."
+                  example: "search_genealogy_database"
+                args:
+                  type: object
+                  description: "Arguments passed to the tool."
+                  example:
+                    query: "John Smith"
+                    max_results: 20
 
 ##############################################################################
 # Model - Living
@@ -10892,6 +11594,10 @@ definitions:
         description: "The unique identifier for a person."
         type: string
         example: "ORFKQC4KLWEGTGR19L"
+      name_display:
+        description: "Preferred name of the person in a predefined display format"
+        type: string
+        example: "Warner, Mary Grace Elizabeth (Mary)"
       name_given:
         description: "Preferred given name of the person."
         type: string

@@ -19,9 +19,9 @@ Simplified parameter models for reduced token usage.
 """
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class EntityType(str, Enum):
@@ -74,8 +74,67 @@ class SimpleFindParams(BaseModel):
 class SimpleSearchParams(BaseModel):
     """Simplified parameters for full-text search."""
 
+    @field_validator("page", mode="before")
+    @classmethod
+    def coerce_page(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce page to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("pagesize", mode="before")
+    @classmethod
+    def coerce_pagesize(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce pagesize to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("max_results", mode="before")
+    @classmethod
+    def coerce_max_results(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce max_results to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("strip", mode="before")
+    @classmethod
+    def coerce_strip(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce strip to bool."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v) if v is not None else None
+
+    @field_validator("semantic", mode="before")
+    @classmethod
+    def coerce_semantic(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce semantic to bool."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v) if v is not None else None
+
     query: str = Field(description="Plain text search query")
-    max_results: int = Field(default=20, description="Maximum results to return")
+    page: Optional[int] = Field(default=None, description="Page number (1-indexed)")
+    pagesize: Optional[int] = Field(default=None, description="Results per page")
+    max_results: Optional[int] = Field(default=None, description="Maximum results (legacy, use pagesize)")
+    type: Optional[str] = Field(default=None, description="Object type filter (person,family,event,place,source,citation,media,repository,note)")
+    sort: Optional[str] = Field(default=None, description="Sort field(s)")
+    strip: Optional[bool] = Field(default=None, description="Strip empty values")
+    locale: Optional[str] = Field(default=None, description="Locale code")
+    profile: Optional[str] = Field(default=None, description="Result profile (default or full)")
+    name_format: Optional[str] = Field(default=None, description="Name format string")
+    semantic: Optional[bool] = Field(default=None, description="Use semantic search")
 
 
 class SimpleGetParams(BaseModel):

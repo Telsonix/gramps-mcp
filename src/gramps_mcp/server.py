@@ -730,7 +730,19 @@ def register_tools():
         async def create_handler(
             *args, handler=handler_func, model=schema, **kwargs
         ):
-            validated = model(**kwargs)
+            # Reason: FastMCP may wrap parameters under a 'query' key instead of
+            # passing flat kwargs. Unwrap if necessary so validators work correctly.
+            # Only unwrap if 'query' is the ONLY key AND its value is a dict (not a string).
+            # This distinguishes between:
+            #   - Wrapped: {'query': {'pagesize': '10', ...}} -> unwrap to {'pagesize': '10', ...}
+            #   - Search: {'query': 'smith', 'page': '1'} -> keep as-is
+            if (kwargs and 'query' in kwargs and len(kwargs) == 1 
+                and isinstance(kwargs['query'], dict)):
+                unwrapped_kwargs = kwargs['query']
+            else:
+                unwrapped_kwargs = kwargs
+            
+            validated = model(**unwrapped_kwargs)
             return await handler(validated.model_dump())
 
         # Set proper metadata so FastMCP generates a flat schema

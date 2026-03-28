@@ -427,9 +427,19 @@ async def find_anything_tool(client, arguments) -> List[TextContent]:
         else:
             data = {}
 
+        # Support both pagesize and max_results for backwards compatibility
+        pagesize_value = data.get("pagesize") or data.get("max_results")
+        
         params = SearchParams(
             query=data.get("query", ""),
-            pagesize=data.get("max_results", 20)
+            page=data.get("page"),
+            pagesize=pagesize_value,
+            type=data.get("type"),
+            sort=data.get("sort"),
+            strip=data.get("strip"),
+            locale=data.get("locale"),
+            profile=data.get("profile"),
+            semantic=data.get("semantic")
         )
 
         # Get tree_id from settings
