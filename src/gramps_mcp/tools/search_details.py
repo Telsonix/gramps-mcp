@@ -26,10 +26,18 @@ from typing import Dict, List
 
 from mcp.types import TextContent
 
-from ..client import GrampsAPIError
+from ..client import GrampsAPIError, GrampsWebAPIClient
 from ..config import get_settings
+from ..handlers.citation_handler import format_citation
+from ..handlers.event_handler import format_event
 from ..handlers.family_detail_handler import format_family_detail
+from ..handlers.media_handler import format_media
+from ..handlers.note_handler import format_note
 from ..handlers.person_detail_handler import format_person_detail
+from ..handlers.place_handler import format_place
+from ..handlers.repository_handler import format_repository
+from ..handlers.source_handler import format_source
+from ..models.api_calls import ApiCalls
 from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
@@ -55,79 +63,78 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
     return [TextContent(type="text", text=f"Error: {error_msg}")]
 
 
-@with_client
-async def get_person_tool(client, arguments) -> List[TextContent]:
-    """
-    Get comprehensive person information using direct API calls.
-    """
-    try:
-        # Extract handle from arguments (handles both dict and BaseModel)
-        handle = _get_arg(arguments, "person_handle")
-        if not handle:
-            raise ValueError("person_handle is required")
-
-        # Get tree_id from settings
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        # Use the detailed person handler to get comprehensive formatted data
-        formatted_person = await format_person_detail(client, tree_id, handle)
-
-        return [TextContent(type="text", text=formatted_person)]
-
-    except Exception as e:
-        return _format_error_response(e, "person details retrieval")
-
-
-@with_client
-async def get_family_tool(client, arguments) -> List[TextContent]:
-    """
-    Get detailed family information using direct API calls.
-    """
-    try:
-        # Extract handle from arguments (handles both dict and BaseModel)
-        handle = _get_arg(arguments, "family_handle")
-        if not handle:
-            raise ValueError("family_handle is required")
-
-        # Get tree_id from settings
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        # Use the detailed family handler to get comprehensive formatted data
-        formatted_family = await format_family_detail(client, tree_id, handle)
-
-        return [TextContent(type="text", text=formatted_family)]
-
-    except Exception as e:
-        return _format_error_response(e, "family details retrieval")
-
-
 async def get_type_tool(arguments) -> List[TextContent]:
-    """Universal get tool for person and family details."""
+    """Universal get tool for any entity type details."""
     entity_type = _get_arg(arguments, "type")
     handle = _get_arg(arguments, "handle")
     gramps_id = _get_arg(arguments, "gramps_id")
 
-    # If gramps_id provided but no handle, find the handle first
+    # Map entity type to the corresponding list API call
+    api_call_map = {
+        "person": ApiCalls.GET_PEOPLE,
+        "family": ApiCalls.GET_FAMILIES,
+        "event": ApiCalls.GET_EVENTS,
+        "place": ApiCalls.GET_PLACES,
+        "source": ApiCalls.GET_SOURCES,
+        "citation": ApiCalls.GET_CITATIONS,
+        "media": ApiCalls.GET_MEDIA,
+        "note": ApiCalls.GET_NOTES,
+        "repository": ApiCalls.GET_REPOSITORIES,
+    }
+
+    if entity_type not in api_call_map:
+        return [TextContent(type="text", text=f"Unsupported entity type: {entity_type}")]
+
+    # If gramps_id provided but no handle, resolve via the API's native gramps_id
+    # query parameter (avoids GQL parsing issues)
     if gramps_id and not handle:
-        from .search_basic import find_type_tool
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+        client = GrampsWebAPIClient()
+        try:
+            results = await client.make_api_call(
+                api_call=api_call_map[entity_type],
+                params={"gramps_id": gramps_id},
+                tree_id=tree_id,
+            )
+            if isinstance(results, list) and len(results) > 0:
+                handle = results[0].get("handle")
+            elif isinstance(results, dict):
+                handle = results.get("handle")
+        finally:
+            await client.close()
 
-        search_result = await find_type_tool(
-            {"type": entity_type, "gql": f'gramps_id="{gramps_id}"', "max_results": 1}
-        )
+    if not handle:
+        return [TextContent(type="text", text=f"Could not find {entity_type} with the provided identifier.")]
 
-        # Extract handle from search result
-        search_text = search_result[0].text
-        import re
+    return await get_entity_tool(entity_type, handle)
 
-        handle_match = re.search(r"\[([^\]]+)\]", search_text)
-        if handle_match:
-            handle = handle_match.group(1)
 
-    if entity_type == "person" and handle:
-        return await get_person_tool({"person_handle": handle})
-    elif entity_type == "family" and handle:
-        return await get_family_tool({"family_handle": handle})
+@with_client
+async def get_entity_tool(client, entity_type: str, handle: str) -> List[TextContent]:
+    """Get details for any entity type: person, family, event, place, source, citation, media, note, or repository."""
+    try:
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
 
-    return [TextContent(type="text", text="get_type_tool not yet implemented")]
+        format_fn_map = {
+            "person": lambda: format_person_detail(client, tree_id, handle),
+            "family": lambda: format_family_detail(client, tree_id, handle),
+            "event": lambda: format_event(client, tree_id, handle),
+            "place": lambda: format_place(client, tree_id, handle),
+            "source": lambda: format_source(client, tree_id, handle),
+            "citation": lambda: format_citation(client, tree_id, handle),
+            "media": lambda: format_media(client, tree_id, handle),
+            "note": lambda: format_note(client, tree_id, handle),
+            "repository": lambda: format_repository(client, tree_id, handle),
+        }
+
+        format_fn = format_fn_map.get(entity_type)
+        if format_fn is None:
+            return [TextContent(type="text", text=f"No formatter available for entity type: {entity_type}")]
+
+        formatted = await format_fn()
+        return [TextContent(type="text", text=formatted)]
+
+    except Exception as e:
+        return _format_error_response(e, f"{entity_type} details retrieval")

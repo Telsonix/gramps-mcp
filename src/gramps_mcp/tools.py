@@ -52,8 +52,6 @@ from .tools import (
     find_source_tool,
     get_ancestors_tool,
     get_descendants_tool,
-    get_family_tool,
-    get_person_tool,
     get_recent_changes_tool,
     get_relations_tool,
     # Analysis Tools
@@ -72,8 +70,6 @@ __all__ = [
     "find_citation_tool",
     "find_media_tool",
     "find_anything_tool",
-    "get_person_tool",
-    "get_family_tool",
     # Data Management Tools
     "create_person_tool",
     "create_family_tool",
