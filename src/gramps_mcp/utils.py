@@ -18,10 +18,26 @@
 Utility functions for gramps_mcp.
 """
 
+from typing import Optional
+
 from markdownify import markdownify as md
 
 from .models.api_calls import ApiCalls
 
+# Mapping from entity type string to the list (GET all) API call.
+# Used by resolve_handle_from_gramps_id to query by gramps_id filter.
+_TYPE_TO_LIST_CALL = {
+    "person": ApiCalls.GET_PEOPLE,
+    "family": ApiCalls.GET_FAMILIES,
+    "event": ApiCalls.GET_EVENTS,
+    "place": ApiCalls.GET_PLACES,
+    "citation": ApiCalls.GET_CITATIONS,
+    "source": ApiCalls.GET_SOURCES,
+    "repository": ApiCalls.GET_REPOSITORIES,
+    "media": ApiCalls.GET_MEDIA,
+    "note": ApiCalls.GET_NOTES,
+    "tag": ApiCalls.GET_TAGS,
+}
 
 def html_to_markdown(html: str) -> str:
     """
@@ -131,3 +147,42 @@ async def get_gramps_id_from_handle(
     except Exception:
         # If we can't resolve it, just return the handle
         return obj_handle
+
+
+async def resolve_handle_from_gramps_id(
+    client, entity_type: str, gramps_id: str, tree_id: str
+) -> Optional[str]:
+    """
+    Resolve a user-facing gramps_id to the internal handle using the list endpoint.
+
+    Queries the appropriate list endpoint with a gramps_id filter and returns
+    the handle of the first matching record.
+
+    Args:
+        client: GrampsWebAPIClient instance.
+        entity_type: Entity type string (e.g., 'person', 'family', 'event').
+        gramps_id: User-facing Gramps ID (e.g., 'I0001', 'F0001', 'E0012').
+        tree_id: Tree identifier.
+
+    Returns:
+        Internal handle string, or None if not found.
+    """
+    from .models.parameters.base_params import BaseGetMultipleParams
+
+    api_call = _TYPE_TO_LIST_CALL.get(entity_type.lower())
+    if not api_call:
+        return None
+    try:
+        # Reason: list endpoints accept gramps_id as a filter query param,
+        # returning only the matching record(s).
+        filter_params = BaseGetMultipleParams(gramps_id=gramps_id)
+        results = await client.make_api_call(
+            api_call=api_call,
+            params=filter_params,
+            tree_id=tree_id,
+        )
+        if isinstance(results, list) and results:
+            return results[0].get("handle")
+        return None
+    except Exception:
+        return None
