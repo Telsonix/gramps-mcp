@@ -247,6 +247,12 @@ class GrampsWebAPIClient:
             ):
                 # For POST/PUT, include all non-None values (APIs expect complete objects)
                 json_data = validated_params.model_dump(exclude_none=True)
+                # Transform note text to StyledText format if this is a note save operation
+                if json_data and "text" in json_data and isinstance(json_data["text"], str):
+                    json_data["text"] = {
+                        "_class": "StyledText",
+                        "string": json_data["text"],
+                    }
             else:
                 # For GET, exclude None values and unset fields (not defaults)
                 # This prevents sending empty params like ?page=&old= that APIs reject

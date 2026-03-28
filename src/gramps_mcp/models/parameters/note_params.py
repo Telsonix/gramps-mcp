@@ -24,8 +24,6 @@ API calls supported in this category:
 - DELETE_NOTE: Delete the note
 """
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from .base_params import BaseGetMultipleParams, BaseGetSingleParams
@@ -58,7 +56,11 @@ class NoteParams(BaseGetSingleParams):
 
 
 class NoteSaveParams(BaseModel):
-    """Parameters for creating or updating a note."""
+    """Parameters for creating or updating a note.
+    
+    Note: The text field is stored as a plain string here. The API
+    client transforms it to StyledText format when making the API call.
+    """
 
     handle: str | None = Field(
         None,
@@ -66,14 +68,3 @@ class NoteSaveParams(BaseModel):
     )
     text: str = Field(..., description="Note text content")
     type: str = Field(..., description="The type of note")
-
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Convert to API format with StyledText structure."""
-        data = super().model_dump(**kwargs)
-        # Transform text string to StyledText format expected by API
-        if "text" in data and isinstance(data["text"], str):
-            data["text"] = {
-                "_class": "StyledText",
-                "string": data["text"],
-            }
-        return data
