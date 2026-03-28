@@ -18,9 +18,27 @@
 Timeline parameter models for the Gramps Web API.
 """
 
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _coerce_bool(v: Union[bool, str, None]) -> Optional[bool]:
+    """Helper to coerce value to bool."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, str):
+        return v.lower() in ("true", "1", "yes", "on")
+    return bool(v) if v is not None else None
+
+
+def _coerce_int(v: Union[int, str, None]) -> Optional[int]:
+    """Helper to coerce value to int."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, str):
+        return int(v)
+    return v
 
 
 class PeopleTimelineParams(BaseModel):
@@ -49,6 +67,30 @@ class PeopleTimelineParams(BaseModel):
         keys: Return only specific fields.
         skipkeys: Omit specific fields.
     """
+
+    @field_validator("first", "last", "ratings", "discard_empty", "strip", mode="before")
+    @classmethod
+    def coerce_bool_fields(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce boolean fields."""
+        return _coerce_bool(v)
+
+    @field_validator("precision", mode="before")
+    @classmethod
+    def coerce_precision(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce precision to int."""
+        return _coerce_int(v)
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def coerce_page(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce page to int."""
+        return _coerce_int(v)
+
+    @field_validator("pagesize", mode="before")
+    @classmethod
+    def coerce_pagesize(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce pagesize to int."""
+        return _coerce_int(v)
 
     anchor: Optional[str] = None
     dates: Optional[str] = None
@@ -92,6 +134,24 @@ class FamiliesTimelineParams(BaseModel):
         keys: Return only specific fields.
         skipkeys: Omit specific fields.
     """
+
+    @field_validator("ratings", "discard_empty", "strip", mode="before")
+    @classmethod
+    def coerce_bool_fields(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce boolean fields."""
+        return _coerce_bool(v)
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def coerce_page(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce page to int."""
+        return _coerce_int(v)
+
+    @field_validator("pagesize", mode="before")
+    @classmethod
+    def coerce_pagesize(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce pagesize to int."""
+        return _coerce_int(v)
 
     handles: Optional[str] = None
     dates: Optional[str] = None

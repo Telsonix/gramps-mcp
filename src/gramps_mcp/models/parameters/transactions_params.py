@@ -18,9 +18,9 @@
 Parameters for transactions endpoints.
 """
 
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TransactionHistoryParams(BaseModel):
@@ -42,6 +42,66 @@ class TransactionHistoryParams(BaseModel):
     Returns:
         Dict[str, Any]: List of transaction history
     """
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def coerce_page(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce page to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("pagesize", mode="before")
+    @classmethod
+    def coerce_pagesize(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce pagesize to int."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
+    @field_validator("old", mode="before")
+    @classmethod
+    def coerce_old(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce old to bool."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("new", mode="before")
+    @classmethod
+    def coerce_new(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce new to bool."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("before", mode="before")
+    @classmethod
+    def coerce_before(cls, v: Union[float, int, str, None]) -> Optional[float]:
+        """Coerce before to float."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return float(v)
+        return float(v) if v is not None else None
+
+    @field_validator("after", mode="before")
+    @classmethod
+    def coerce_after(cls, v: Union[float, int, str, None]) -> Optional[float]:
+        """Coerce after to float."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return float(v)
+        return float(v) if v is not None else None
 
     old: Optional[bool] = Field(
         None, description="Whether to include the raw object data before the change"

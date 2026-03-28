@@ -148,6 +148,26 @@ class PersonTimelineParams(BaseModel):
     Note: This endpoint does NOT support gramps_id, sort, gql, backlinks, extend, profile.
     """
 
+    @field_validator("first", "last", "ratings", "discard_empty", "omit_anchor", "strip", mode="before")
+    @classmethod
+    def coerce_bool_fields(cls, v: Union[bool, str, None]) -> Optional[bool]:
+        """Coerce boolean fields."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v) if v is not None else None
+
+    @field_validator("ancestors", "offspring", "precision", "page", "pagesize", mode="before")
+    @classmethod
+    def coerce_int_fields(cls, v: Union[int, str, None]) -> Optional[int]:
+        """Coerce integer fields."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return int(v)
+        return v
+
     dates: Optional[str] = Field(
         None,
         description=(
