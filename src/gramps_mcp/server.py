@@ -730,6 +730,9 @@ def register_tools():
         async def create_handler(
             *args, handler=handler_func, model=schema, **kwargs
         ):
+            # Log raw parameters received from FastMCP
+            logger.info(f"[TOOL INVOKED] {tool_name} | Raw kwargs: {kwargs}")
+            
             # Reason: FastMCP may wrap parameters under a 'query' key instead of
             # passing flat kwargs. Unwrap if necessary so validators work correctly.
             # Only unwrap if 'query' is the ONLY key AND its value is a dict (not a string).
@@ -739,11 +742,22 @@ def register_tools():
             if (kwargs and 'query' in kwargs and len(kwargs) == 1 
                 and isinstance(kwargs['query'], dict)):
                 unwrapped_kwargs = kwargs['query']
+                logger.info(f"[UNWRAP] {tool_name} | Unwrapped from query wrapper: {unwrapped_kwargs}")
             else:
                 unwrapped_kwargs = kwargs
+                if kwargs:
+                    logger.info(f"[NO UNWRAP] {tool_name} | Using kwargs as-is (not wrapped)")
             
-            validated = model(**unwrapped_kwargs)
-            return await handler(validated.model_dump())
+            # Validate using Pydantic model (invokes field_validators for type coercion)
+            try:
+                validated = model(**unwrapped_kwargs)
+                validated_data = validated.model_dump()
+                logger.info(f"[VALIDATED] {tool_name} | After type coercion: {validated_data}")
+            except Exception as e:
+                logger.error(f"[VALIDATION ERROR] {tool_name} | Error: {e}")
+                raise
+            
+            return await handler(validated_data)
 
         # Set proper metadata so FastMCP generates a flat schema
         create_handler.__name__ = tool_name
