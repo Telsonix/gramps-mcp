@@ -77,10 +77,7 @@ from .search_basic import (
     find_repository_tool,
     find_source_tool,
 )
-from .search_details import (
-    get_family_tool,
-    get_person_tool,
-)
+from .search_details import get_type_tool
 
 # Export all tools for easy import
 __all__ = [
@@ -94,8 +91,7 @@ __all__ = [
     "find_citation_tool",
     "find_media_tool",
     "find_anything_tool",
-    "get_person_tool",
-    "get_family_tool",
+    "get_type_tool",
     # Data Management Tools - Create
     "create_person_tool",
     "create_family_tool",

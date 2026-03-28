@@ -52,6 +52,13 @@ class GetEntityType(str, Enum):
 
     PERSON = "person"
     FAMILY = "family"
+    EVENT = "event"
+    PLACE = "place"
+    SOURCE = "source"
+    CITATION = "citation"
+    MEDIA = "media"
+    NOTE = "note"
+    REPOSITORY = "repository"
 
     @classmethod
     def _missing_(cls, value: object):
