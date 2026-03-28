@@ -95,6 +95,74 @@ def _validate_params(arguments, param_class):
     return param_class(**arguments)
 
 
+async def _do_delete(
+    entity_type: str,
+    api_call: ApiCalls,
+    arguments,
+    operation_name: str,
+) -> List[TextContent]:
+    """
+    Generic delete helper shared by all delete tool functions.
+
+    Accepts either handle or gramps_id from DeleteParams, resolves gramps_id
+    to an internal handle when needed, then calls the delete endpoint.
+
+    Args:
+        entity_type: Lowercase entity type string (e.g., 'person', 'event').
+        api_call: The DELETE ApiCalls enum value for this entity type.
+        arguments: Raw tool arguments (dict or validated DeleteParams).
+        operation_name: Human-readable name used in error messages.
+
+    Returns:
+        List containing a single TextContent with success or error message.
+    """
+    from ..models.parameters.delete_params import DeleteParams
+    from ..utils import resolve_handle_from_gramps_id
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            handle = params.handle
+            if not handle:
+                # Reason: API endpoints require an internal handle in the URL;
+                # gramps_id must be resolved to a handle before the delete call.
+                handle = await resolve_handle_from_gramps_id(
+                    client, entity_type, params.gramps_id, tree_id
+                )
+                if not handle:
+                    return [
+                        TextContent(
+                            type="text",
+                            text=(
+                                f"No {entity_type} found with "
+                                f"gramps_id: {params.gramps_id}"
+                            ),
+                        )
+                    ]
+
+            await client.make_api_call(
+                api_call=api_call,
+                params=None,
+                tree_id=tree_id,
+                handle=handle,
+            )
+            identifier = params.gramps_id or handle
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted {entity_type}: {identifier}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, operation_name)
+
+
 async def _handle_crud_operation(
     params, entity_type: str, post_api_call, put_api_call, param_class
 ) -> List[TextContent]:
@@ -462,269 +530,53 @@ async def create_repository_tool(arguments) -> List[TextContent]:
 
 
 # ============================================================================
-# Delete Tools (2 tools)
+# Delete Tools
 # ============================================================================
 
 
 async def delete_person_tool(arguments) -> List[TextContent]:
-    """Delete a person by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_PERSON,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted person with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "person delete")
+    """Delete a person by handle or gramps_id."""
+    return await _do_delete("person", ApiCalls.DELETE_PERSON, arguments, "person delete")
 
 
 async def delete_family_tool(arguments) -> List[TextContent]:
-    """Delete a family by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_FAMILY,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted family with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "family delete")
+    """Delete a family by handle or gramps_id."""
+    return await _do_delete("family", ApiCalls.DELETE_FAMILY, arguments, "family delete")
 
 
 async def delete_event_tool(arguments) -> List[TextContent]:
-    """Delete an event by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_EVENT,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted event with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "event delete")
+    """Delete an event by handle or gramps_id."""
+    return await _do_delete("event", ApiCalls.DELETE_EVENT, arguments, "event delete")
 
 
 async def delete_note_tool(arguments) -> List[TextContent]:
-    """Delete a note by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_NOTE,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted note with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "note delete")
+    """Delete a note by handle or gramps_id."""
+    return await _do_delete("note", ApiCalls.DELETE_NOTE, arguments, "note delete")
 
 
 async def delete_citation_tool(arguments) -> List[TextContent]:
-    """Delete a citation by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_CITATION,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted citation with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "citation delete")
+    """Delete a citation by handle or gramps_id."""
+    return await _do_delete("citation", ApiCalls.DELETE_CITATION, arguments, "citation delete")
 
 
 async def delete_source_tool(arguments) -> List[TextContent]:
-    """Delete a source by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_SOURCE,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted source with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "source delete")
+    """Delete a source by handle or gramps_id."""
+    return await _do_delete("source", ApiCalls.DELETE_SOURCE, arguments, "source delete")
 
 
 async def delete_place_tool(arguments) -> List[TextContent]:
-    """Delete a place by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_PLACE,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted place with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "place delete")
+    """Delete a place by handle or gramps_id."""
+    return await _do_delete("place", ApiCalls.DELETE_PLACE, arguments, "place delete")
 
 
 async def delete_repository_tool(arguments) -> List[TextContent]:
-    """Delete a repository by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_REPOSITORY,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted repository with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "repository delete")
+    """Delete a repository by handle or gramps_id."""
+    return await _do_delete("repository", ApiCalls.DELETE_REPOSITORY, arguments, "repository delete")
 
 
 async def delete_media_tool(arguments) -> List[TextContent]:
-    """Delete a media item by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_MEDIA_ITEM,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted media with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "media delete")
+    """Delete a media item by handle or gramps_id."""
+    return await _do_delete("media", ApiCalls.DELETE_MEDIA_ITEM, arguments, "media delete")
 
 
 # ============================================================================
@@ -826,32 +678,8 @@ async def create_tag_tool(arguments) -> List[TextContent]:
 
 
 async def delete_tag_tool(arguments) -> List[TextContent]:
-    """Delete a tag by handle."""
-    from ..models.parameters.delete_params import DeleteParams
-
-    try:
-        params = _validate_params(arguments, DeleteParams)
-        settings = get_settings()
-        tree_id = settings.gramps_tree_id
-
-        client = GrampsWebAPIClient()
-        try:
-            await client.make_api_call(
-                api_call=ApiCalls.DELETE_TAG,
-                params=None,
-                tree_id=tree_id,
-                handle=params.handle,
-            )
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully deleted tag with handle: {params.handle}",
-                )
-            ]
-        finally:
-            await client.close()
-    except Exception as e:
-        return _format_error_response(e, "tag delete")
+    """Delete a tag by handle or gramps_id."""
+    return await _do_delete("tag", ApiCalls.DELETE_TAG, arguments, "tag delete")
 
 
 # ============================================================================
@@ -866,26 +694,52 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
     Note: This returns file metadata. The actual file can be accessed
     via the Gramps Web UI or API directly.
     """
-    from ..models.parameters.delete_params import DeleteParams
+    from ..models.parameters.media_params import MediaGetParams
 
     try:
-        params = _validate_params(arguments, DeleteParams)
+        params = _validate_params(arguments, MediaGetParams)
         settings = get_settings()
         tree_id = settings.gramps_tree_id
 
+        handle = params.handle
+        gramps_id = params.gramps_id
+
+        if not handle and not gramps_id:
+            return [TextContent(type="text", text="Error: provide handle or gramps_id")]
+
         client = GrampsWebAPIClient()
         try:
+            # Resolve gramps_id to internal handle if handle not provided
+            if not handle and gramps_id:
+                media_list = await client.make_api_call(
+                    api_call=ApiCalls.GET_MEDIA,
+                    params=None,
+                    tree_id=tree_id,
+                )
+                if isinstance(media_list, list):
+                    for item in media_list:
+                        if item.get("gramps_id") == gramps_id:
+                            handle = item.get("handle")
+                            break
+                if not handle:
+                    return [
+                        TextContent(
+                            type="text",
+                            text=f"Media not found for gramps_id: {gramps_id}",
+                        )
+                    ]
+
             # First get media metadata
             media_info = await client.make_api_call(
                 api_call=ApiCalls.GET_MEDIA_ITEM,
                 params=None,
                 tree_id=tree_id,
-                handle=params.handle,
+                handle=handle,
             )
 
             if not media_info:
                 return [
-                    TextContent(type="text", text=f"Media not found: {params.handle}")
+                    TextContent(type="text", text=f"Media not found: {handle}")
                 ]
 
             # Format response
@@ -899,13 +753,13 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
             result += f"**Description:** {desc}\n"
             result += f"**MIME Type:** {mime}\n"
             result += f"**Path:** {path}\n"
-            result += f"**Handle:** `{params.handle}`\n"
+            result += f"**Handle:** `{handle}`\n"
             if checksum:
                 result += f"**Checksum:** {checksum}\n"
 
             # Provide download URL hint
             api_url = settings.gramps_api_url
-            result += f"\n**File URL:** `{api_url}/api/trees/{tree_id}/media/{params.handle}/file`\n"
+            result += f"\n**File URL:** `{api_url}/api/trees/{tree_id}/media/{handle}/file`\n"
 
             return [TextContent(type="text", text=result)]
 

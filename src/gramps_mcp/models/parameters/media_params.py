@@ -43,6 +43,15 @@ class MediaSearchParams(BaseGetMultipleParams):
     )
 
 
+class MediaGetParams(BaseModel):
+    """Parameters for getting a specific media item by handle or Gramps ID."""
+
+    handle: Optional[str] = Field(None, description="Media internal handle")
+    gramps_id: Optional[str] = Field(
+        None, description="Gramps ID (e.g. O0001) - alternative to handle"
+    )
+
+
 class MediaFileParams(BaseModel):
     """Parameters for media file operations."""
 

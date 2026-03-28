@@ -21,7 +21,7 @@ Simplified parameter models for reduced token usage.
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class EntityType(str, Enum):
@@ -37,12 +37,30 @@ class EntityType(str, Enum):
     REPOSITORY = "repository"
     NOTE = "note"
 
+    @classmethod
+    def _missing_(cls, value: object):
+        """Allow case-insensitive lookup."""
+        if isinstance(value, str):
+            for member in cls:
+                if member.value == value.lower():
+                    return member
+        return None
+
 
 class GetEntityType(str, Enum):
     """Entity types that support detailed get operations."""
 
     PERSON = "person"
     FAMILY = "family"
+
+    @classmethod
+    def _missing_(cls, value: object):
+        """Allow case-insensitive lookup."""
+        if isinstance(value, str):
+            for member in cls:
+                if member.value == value.lower():
+                    return member
+        return None
 
 
 class SimpleFindParams(BaseModel):
@@ -68,6 +86,15 @@ class SimpleGetParams(BaseModel):
     gramps_id: Optional[str] = Field(
         default=None, description="Gramps ID (e.g., I0001 or F0001)"
     )
+
+    @model_validator(mode="after")
+    def require_exactly_one_identifier(self) -> "SimpleGetParams":
+        """Enforce that exactly one of handle or gramps_id is provided."""
+        if bool(self.handle) and bool(self.gramps_id):
+            raise ValueError("Provide either handle or gramps_id, not both.")
+        if not self.handle and not self.gramps_id:
+            raise ValueError("Either handle or gramps_id is required.")
+        return self
 
 
 class EmptyParams(BaseModel):

@@ -148,7 +148,11 @@ class GrampsWebAPIClient:
         elif status_code == 404:
             return "Record not found."
         elif status_code == 422:
-            return "Invalid data provided."
+            try:
+                body = error.response.json()
+            except Exception:
+                body = error.response.text
+            return f"Invalid data provided (422): {body}"
         elif status_code >= 500:
             return "Server error. Please try again later."
         else:
@@ -244,7 +248,10 @@ class GrampsWebAPIClient:
             else:
                 # For GET, only include explicitly set values (not defaults)
                 # This prevents sending extra params that APIs may reject
-                request_params = validated_params.model_dump(exclude_unset=True)
+                # Use mode='json' to ensure enums are serialized as plain strings
+                request_params = validated_params.model_dump(
+                    mode="json", exclude_unset=True
+                )
 
         # For PUT operations, preserve existing data by merging with changes
         if api_call.method == "PUT" and json_data:

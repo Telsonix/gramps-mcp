@@ -27,11 +27,51 @@ API calls supported in this category:
 - GET_PERSON_DNA_MATCHES: Get DNA matches for a specific person
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .base_params import BaseDataModel
+
+_GENDER_MAP = {
+    "female": 0,
+    "f": 0,
+    "male": 1,
+    "m": 1,
+    "unknown": 2,
+    "u": 2,
+    "other": 2,
+}
+
+
+def _build_name_object(value: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Convert a plain name string into a Gramps Name object dict.
+
+    Splits on whitespace: last token becomes the surname, everything before
+    it becomes first_name.  If only one token is given it is used as surname.
+
+    Args:
+        value: Either a full name string (e.g. "John Smith") or an already
+               constructed name dict.
+
+    Returns:
+        Dict[str, Any]: A Gramps-compatible Name object.
+    """
+    if isinstance(value, dict):
+        return value
+    parts = value.strip().split()
+    if len(parts) > 1:
+        first_name = " ".join(parts[:-1])
+        surname = parts[-1]
+    else:
+        first_name = ""
+        surname = parts[0] if parts else ""
+    return {
+        "first_name": first_name,
+        "surname_list": [{"surname": surname, "primary": True}],
+        "type": "Birth Name",
+    }
 
 
 class EventReference(BaseModel):
@@ -44,12 +84,42 @@ class EventReference(BaseModel):
 class PersonData(BaseDataModel):
     """Model for creating or updating a person in Gramps API."""
 
-    primary_name: Dict[str, Any] = Field(
-        ..., description="Person's primary name object with first_name and surname_list"
+    primary_name: Union[str, Dict[str, Any]] = Field(
+        ...,
+        description=(
+            "Person's primary name. Can be a plain string like 'John Smith' "
+            "(last word becomes the surname) or a full Gramps Name object dict "
+            "with first_name and surname_list."
+        ),
     )
-    gender: int = Field(
-        ..., ge=0, le=2, description="Gender (0=Female, 1=Male, 2=Unknown)"
+    gender: Union[int, str] = Field(
+        ...,
+        description=(
+            "Gender: integer (0=Female, 1=Male, 2=Unknown) or string "
+            "('Female', 'Male', 'Unknown')"
+        ),
     )
+
+    @field_validator("primary_name", mode="before")
+    @classmethod
+    def coerce_primary_name(cls, v: Any) -> Dict[str, Any]:
+        """Accept a plain name string and build a proper Name object."""
+        return _build_name_object(v)
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def coerce_gender(cls, v: Any) -> int:
+        """Accept string gender labels and convert to Gramps integer codes."""
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            mapped = _GENDER_MAP.get(v.lower())
+            if mapped is not None:
+                return mapped
+            raise ValueError(
+                f"Invalid gender '{v}'. Use 'Male', 'Female', or 'Unknown' (or 0/1/2)."
+            )
+        raise ValueError(f"gender must be an int or string, got {type(v)}")
     alternate_names: Optional[List[Dict[str, Any]]] = Field(
         None,
         description=(
