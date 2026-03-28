@@ -29,7 +29,7 @@ API calls supported in this category:
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from .base_params import BaseDataModel, BaseGetMultipleParams
 
