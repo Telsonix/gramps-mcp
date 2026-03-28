@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from .base_params import BaseDataModel, BaseGetMultipleParams
+from .base_params import BaseDataModel
 
 _GENDER_MAP = {
     "female": 0,
@@ -142,10 +142,10 @@ class PersonData(BaseDataModel):
     )
 
 
-class PersonTimelineParams(BaseGetMultipleParams):
+class PersonTimelineParams(BaseModel):
     """Parameters for getting a person's timeline from Gramps API.
     
-    Inherits pagination parameters (page, pagesize, sort) from BaseGetMultipleParams.
+    Note: This endpoint does NOT support gramps_id, sort, gql, backlinks, extend, profile.
     """
 
     dates: Optional[str] = Field(
@@ -194,6 +194,12 @@ class PersonTimelineParams(BaseGetMultipleParams):
     omit_anchor: Optional[bool] = Field(
         None, description="Omit person info for events pertaining to that person"
     )
+    locale: Optional[str] = Field(None, description="Locale for localized data")
+    strip: Optional[bool] = Field(None, description="Strip empty values from results")
+    keys: Optional[str] = Field(None, description="Return only specific fields")
+    skipkeys: Optional[str] = Field(None, description="Omit specific fields")
+    page: Optional[int] = Field(None, ge=0, description="Page number for pagination")
+    pagesize: Optional[int] = Field(None, gt=0, description="Number of records per page")
 
 
 class PersonDnaMatchesParams(BaseModel):

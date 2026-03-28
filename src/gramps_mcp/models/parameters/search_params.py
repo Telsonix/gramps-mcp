@@ -23,21 +23,30 @@ API calls supported in this category:
 
 from typing import Optional
 
-from pydantic import Field
-
-from .base_params import BaseGetMultipleParams
+from pydantic import BaseModel, Field
 
 
-class SearchParams(BaseGetMultipleParams):
+class SearchParams(BaseModel):
     """
     Parameters for performing a full-text search on multiple objects.
 
-    Used by GET /search endpoint. Inherits pagination parameters from BaseGetMultipleParams.
+    Used by GET /search endpoint. Note: This endpoint does NOT support
+    gramps_id, gql, backlinks, extend filters. Only the fields below are valid.
     """
 
     query: str = Field(..., description="The search string")
+    page: Optional[int] = Field(None, ge=0, description="Page number for pagination")
+    pagesize: Optional[int] = Field(None, gt=0, description="Number of records per page")
+    sort: Optional[str] = Field(None, description="Field to sort by")
     type: Optional[str] = Field(
         None, description="A comma delimited list of object types to include"
+    )
+    strip: Optional[bool] = Field(
+        None, description="Strip empty values from results"
+    )
+    locale: Optional[str] = Field(None, description="Locale for localized data")
+    profile: Optional[str] = Field(
+        None, description="Summary profile (default or full)"
     )
     semantic: Optional[bool] = Field(
         None,
