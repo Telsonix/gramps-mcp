@@ -25,19 +25,17 @@ API calls supported in this category:
 - DELETE_TAG: Delete the tag
 """
 
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from .base_params import BaseGetMultipleParams
 
-class TagSearchParams(BaseModel):
-    """Parameters for searching tags."""
 
-    page: Optional[int] = Field(None, description="Page number for pagination", ge=0)
-    pagesize: Optional[int] = Field(
-        None, description="Number of results per page", ge=1, le=100
-    )
-    sort: Optional[List[str]] = Field(None, description="Sort order for results")
+class TagSearchParams(BaseGetMultipleParams):
+    """Parameters for searching tags - inherits page, pagesize, sort, etc. from base."""
+
+    pass
 
 
 class TagSaveParams(BaseModel):
