@@ -248,11 +248,11 @@ class GrampsWebAPIClient:
                 # For POST/PUT, include all non-None values (APIs expect complete objects)
                 json_data = validated_params.model_dump(exclude_none=True)
             else:
-                # For GET, only include explicitly set values (not defaults)
-                # This prevents sending extra params that APIs may reject
+                # For GET, exclude None values and unset fields (not defaults)
+                # This prevents sending empty params like ?page=&old= that APIs reject
                 # Use mode='json' to ensure enums are serialized as plain strings
                 request_params = validated_params.model_dump(
-                    mode="json", exclude_unset=True
+                    mode="json", exclude_unset=True, exclude_none=True
                 )
 
         # For PUT operations, preserve existing data by merging with changes
@@ -335,6 +335,7 @@ class GrampsWebAPIClient:
             f"Query params: {request_params} | "
             f"JSON data: {json_data}"
         )
+        logger.debug(f"[FULL VALIDATION] Before serialization: {validated_params.model_dump() if validated_params else None}")
 
         # Make the API request
         return await self._make_request(
