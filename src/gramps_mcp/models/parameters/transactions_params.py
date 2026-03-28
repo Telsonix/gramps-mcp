@@ -22,25 +22,20 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from .base_params import BaseGetMultipleParams
 
-class TransactionHistoryParams(BaseModel):
+
+class TransactionHistoryParams(BaseGetMultipleParams):
     """
     Parameters for getting transaction history.
 
-    Args:
-        old (Optional[bool]): Whether to include the raw object data before the
-            change
-        new (Optional[bool]): Whether to include the raw object data after the
-            change
-        page (Optional[int]): Page number representing a subset of results to
-            be returned
-        pagesize (Optional[int]): The number of items that constitute a page
-        sort (Optional[str]): Sort the transactions. Can be 'id' to sort
-            ascending, '-id' to sort descending
-        before (Optional[float]): Unix timestamp. Only return transactions
-            committed before this time
-        after (Optional[float]): Unix timestamp. Only return transactions
-            committed after this time
+    Inherits pagination parameters (page, pagesize, sort) from BaseGetMultipleParams.
+    
+    Custom parameters:
+        old (Optional[bool]): Whether to include the raw object data before the change
+        new (Optional[bool]): Whether to include the raw object data after the change
+        before (Optional[float]): Unix timestamp. Only return transactions committed before this time
+        after (Optional[float]): Unix timestamp. Only return transactions committed after this time
 
     Returns:
         Dict[str, Any]: List of transaction history
@@ -52,26 +47,13 @@ class TransactionHistoryParams(BaseModel):
     new: Optional[bool] = Field(
         None, description="Whether to include the raw object data after the change"
     )
-    page: Optional[int] = Field(
-        None, description="Page number representing a subset of results to be returned"
-    )
-    pagesize: Optional[int] = Field(
-        None, description="The number of items that constitute a page"
-    )
-    sort: Optional[str] = Field(
-        None,
-        description="Sort the transactions. Can be 'id' to sort ascending, "
-        "'-id' to sort descending",
-    )
     before: Optional[float] = Field(
         None,
-        description="Unix timestamp. Only return transactions committed before "
-        "this time",
+        description="Unix timestamp. Only return transactions committed before this time",
     )
     after: Optional[float] = Field(
         None,
-        description="Unix timestamp. Only return transactions committed after "
-        "this time",
+        description="Unix timestamp. Only return transactions committed after this time",
     )
 
 

@@ -119,7 +119,11 @@ class FamilySaveParams(BaseModel):
 
 
 class FamilyTimelineParams(BaseModel):
-    """Parameters for getting family timeline information."""
+    """Parameters for getting family timeline information.
+    
+    Parameters handle and page/pagesize follow BaseGetMultipleParams patterns
+    for consistency, even though handle is path parameter and pagination is optional.
+    """
 
     handle: str = Field(min_length=8, description="The unique identifier for a family")
     dates: Optional[str] = Field(None, description="Date range to bound the timeline")
