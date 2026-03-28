@@ -154,13 +154,21 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "find_anything": {
         "description": (
-            "Perform a plain text search across ALL genealogy records (people, families, "
+            "Perform a full-text search across ALL genealogy records (people, families, "
             "events, places, sources, citations, notes, media, repositories). "
-            "Matches literal text strings anywhere in record fields. "
-            "REQUIRED: query (plain text string). OPTIONAL: max_results (default 20). "
-            "Use this for quick keyword searches when you want to find records containing "
-            "a specific name, place, or keyword without learning GQL syntax. "
-            "Returns handles and gramps_ids of all matching records."
+            "Matches text strings in record fields using full-text search or semantic search. "
+            "REQUIRED: query (plain text string to search for). "
+            "OPTIONAL PARAMETERS: "
+            "- type (str): Filter by object type (person/family/event/place/source/citation/media/note/repository). "
+            "- page (int >= 0): Page number for pagination (starts at 0). "
+            "- pagesize (int > 0): Number of results per page (default 20). "
+            "- sort (str): Sort field (e.g., 'name' or '-date' for descending). "
+            "- strip (bool): Remove empty values from results for cleaner output. "
+            "- locale (str): Localization code for multi-language support. "
+            "- profile (str): Result profile ('default' or 'full' for more data). "
+            "- semantic (bool): Use semantic (AI-powered) search instead of exact text match (default false). "
+            "Returns: Handles, gramps_ids, and brief info of all matching records. "
+            "Use for quick keyword searches without learning GQL syntax."
         ),
         "schema": SimpleSearchParams,
         "handler": find_anything_tool,
@@ -428,8 +436,16 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "recent_changes": {
         "description": (
             "Get a log of recent changes/modifications to the family tree. "
-            "OPTIONAL: pagesize, page number for pagination. "
             "Shows what records were created, updated, or modified and when. "
+            "OPTIONAL PARAMETERS: "
+            "- page (int >= 0): Page number for pagination. "
+            "- pagesize (int > 0): Number of records per page. "
+            "- sort (str): Sort field (e.g., '-id' for descending by ID, default is '-id'). "
+            "- old (bool): Include raw object data BEFORE the change. "
+            "- new (bool): Include raw object data AFTER the change. "
+            "- before (float): Unix timestamp — return only changes BEFORE this time. "
+            "- after (float): Unix timestamp — return only changes AFTER this time. "
+            "Returns: Transaction history with object type, action (create/update), timestamps. "
             "Useful for tracking tree modifications, auditing changes, or resuming work."
         ),
         "schema": TransactionHistoryParams,
@@ -486,10 +502,17 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # ========================================================================
     "find_tags": {
         "description": (
-            "List all tags in the database with optional pagination. "
-            "OPTIONAL: page, pagesize (for pagination). "
+            "List all tags in the database with optional pagination and filtering. "
             "Tags are labels for organizing records. "
-            "Returns list of all available tags with names, colors, and priorities. "
+            "OPTIONAL PARAMETERS: "
+            "- page (int >= 0): Page number for pagination (starts at 0). "
+            "- pagesize (int > 0): Number of tags per page (default 20). "
+            "- sort (str): Field to sort by (e.g., 'name', '-date'). "
+            "- strip (bool): Remove empty/null values from results. "
+            "- locale (str): Localization code (e.g., 'en_US', 'de_DE'). "
+            "- keys (str): Return only specific fields (comma-separated). "
+            "- skipkeys (str): Omit specific fields (comma-separated). "
+            "Returns: List of tags with names, colors, priorities, handles, and gramps_ids. "
             "Use before create_tag to check existing tags and avoid duplicates."
         ),
         "schema": TagSearchParams,
@@ -521,10 +544,27 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "get_people_timeline": {
         "description": (
             "Get a chronological timeline of all events for a list of people. "
-            "REQUIRED: list of gramps_ids or handles of people. "
-            "OPTIONAL: date range, event types, include ratings/citations. "
             "Returns events sorted by date for all specified people. "
-            "Use for understanding life sequences, migration patterns, family stories."
+            "OPTIONAL PARAMETERS: "
+            "- handles (str): Comma-separated list of person handles (e.g., 'H001,H002,H003'). "
+            "- anchor (str): Handle of a person to anchor/focus the timeline. "
+            "- dates (str): Date range filter (formats: '-y/m/d', 'y/m/d-y/m/d', or 'y/m/d-'). "
+            "- first (bool): Include events before anchor person's first event. "
+            "- last (bool): Include events after anchor person's last event. "
+            "- filter (str): Use a named filter query for advanced filtering. "
+            "- rules (str): JSON filter expressions for custom complex filtering. "
+            "- events (str): Comma-separated event types to include (e.g., 'Birth,Death,Marriage'). "
+            "- event_classes (str): Event classes to include (Primary, Family). "
+            "- ratings (bool): Include citation count and confidence scores. "
+            "- precision (int 1-3): Date precision level in results. "
+            "- discard_empty (bool): Skip events without dates. "
+            "- locale (str): Localization code for output formatting. "
+            "- page (int >= 0): Page number for pagination. "
+            "- pagesize (int > 0): Events per page. "
+            "- strip (bool): Remove empty values from results. "
+            "- keys (str): Return only specific fields. "
+            "- skipkeys (str): Omit specific fields. "
+            "Use for understanding life sequences, migration patterns, and family stories."
         ),
         "schema": PeopleTimelineParams,
         "handler": get_people_timeline_tool,
@@ -532,9 +572,23 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "get_families_timeline": {
         "description": (
             "Get a chronological timeline of all events for a list of families. "
-            "REQUIRED: list of family gramps_ids or handles. "
-            "OPTIONAL: date range, event types, include ratings. "
-            "Returns events sorted by date for family units. "
+            "Returns events sorted by date for family units and their members. "
+            "OPTIONAL PARAMETERS: "
+            "- handles (str): Comma-separated list of family handles (e.g., 'F001,F002,F003'). "
+            "- dates (str): Date range filter (formats: '-y/m/d', 'y/m/d-y/m/d', or 'y/m/d-'). "
+            "- filter (str): Use a named filter query for advanced filtering. "
+            "- rules (str): JSON filter expressions for custom complex filtering. "
+            "- events (str): Comma-separated event types to include (e.g., 'Marriage,Divorce'). "
+            "- event_classes (str): Event classes to include (Primary, Family). "
+            "- ratings (bool): Include citation count and confidence scores. "
+            "- discard_empty (bool): Skip events without dates. "
+            "- locale (str): Localization code for output formatting. "
+            "- page (int >= 0): Page number for pagination. "
+            "- pagesize (int > 0): Events per page. "
+            "- strip (bool): Remove empty values from results. "
+            "- keys (str): Return only specific fields. "
+            "- skipkeys (str): Omit specific fields. "
+            "Returns: Events for all people in the families with dates, types, descriptions. "
             "Use for understanding family history progression and significant milestones."
         ),
         "schema": FamiliesTimelineParams,

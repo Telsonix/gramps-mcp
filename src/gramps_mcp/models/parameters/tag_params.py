@@ -29,13 +29,22 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from .base_params import BaseGetMultipleParams
 
+class TagSearchParams(BaseModel):
+    """
+    Parameters for searching tags.
+    
+    Note: This endpoint does NOT support gramps_id, gql, backlinks, extend, profile.
+    Only the fields below are valid.
+    """
 
-class TagSearchParams(BaseGetMultipleParams):
-    """Parameters for searching tags - inherits page, pagesize, sort, etc. from base."""
-
-    pass
+    page: Optional[int] = Field(None, ge=0, description="Page number for pagination")
+    pagesize: Optional[int] = Field(None, gt=0, description="Number of records per page")
+    sort: Optional[str] = Field(None, description="Field to sort by")
+    strip: Optional[bool] = Field(None, description="Strip empty values from results")
+    keys: Optional[str] = Field(None, description="Return only specific fields")
+    skipkeys: Optional[str] = Field(None, description="Omit specific fields")
+    locale: Optional[str] = Field(None, description="Locale for localized data")
 
 
 class TagSaveParams(BaseModel):

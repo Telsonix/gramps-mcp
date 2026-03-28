@@ -20,16 +20,14 @@ Timeline parameter models for the Gramps Web API.
 
 from typing import Optional
 
-from pydantic import Field
-
-from .base_params import BaseGetMultipleParams
+from pydantic import BaseModel, Field
 
 
-class PeopleTimelineParams(BaseGetMultipleParams):
+class PeopleTimelineParams(BaseModel):
     """
     Parameters for getting the timeline for a group of people.
 
-    Inherits pagination parameters (page, pagesize, sort) from BaseGetMultipleParams.
+    Note: This endpoint does NOT support gramps_id, sort, gql, backlinks, extend, profile.
     
     Args:
         anchor: Handle of a person to anchor the timeline.
@@ -37,12 +35,19 @@ class PeopleTimelineParams(BaseGetMultipleParams):
         first: Whether events prior to anchor person's first event should be included.
         last: Whether events after anchor person's last event should be included.
         handles: Comma delimited list of handles for specific people.
+        filter: Use named filter for complex queries.
+        rules: JSON filter expressions for custom filtering.
         events: Comma delimited list of specific events to include.
         event_classes: Comma delimited list of event classes to include.
         ratings: Whether to include citation count and confidence score.
         precision: Number of significant levels for date representation (1-3).
         discard_empty: Whether to discard undated events.
-        omit_anchor: Whether to omit anchor person info from their own events.
+        locale: Locale for localized data.
+        page: Page number for pagination.
+        pagesize: Number of records per page.
+        strip: Strip empty values from results.
+        keys: Return only specific fields.
+        skipkeys: Omit specific fields.
     """
 
     anchor: Optional[str] = None
@@ -50,32 +55,55 @@ class PeopleTimelineParams(BaseGetMultipleParams):
     first: bool = True
     last: bool = True
     handles: Optional[str] = None
+    filter: Optional[str] = None
+    rules: Optional[str] = None
     events: Optional[str] = None
     event_classes: Optional[str] = None
     ratings: bool = False
     precision: int = Field(default=1, ge=1, le=3)
     discard_empty: bool = True
-    omit_anchor: bool = True
+    locale: Optional[str] = None
+    page: Optional[int] = Field(None, ge=0)
+    pagesize: Optional[int] = Field(None, gt=0)
+    strip: Optional[bool] = None
+    keys: Optional[str] = None
+    skipkeys: Optional[str] = None
 
 
-class FamiliesTimelineParams(BaseGetMultipleParams):
+class FamiliesTimelineParams(BaseModel):
     """
     Parameters for getting the timeline for all people in a group of families.
 
-    Inherits pagination parameters (page, pagesize, sort) from BaseGetMultipleParams.
+    Note: This endpoint does NOT support gramps_id, sort, gql, backlinks, extend, profile.
     
     Args:
         handles: Comma delimited list of handles for specific families.
         dates: Date range to bound the timeline (formats: -y/m/d, y/m/d-y/m/d, y/m/d-).
+        filter: Use named filter for complex queries.
+        rules: JSON filter expressions for custom filtering.
         events: Comma delimited list of specific events to include.
         event_classes: Comma delimited list of event classes to include.
         ratings: Whether to include citation count and confidence score.
         discard_empty: Whether to discard undated events.
+        locale: Locale for localized data.
+        page: Page number for pagination.
+        pagesize: Number of records per page.
+        strip: Strip empty values from results.
+        keys: Return only specific fields.
+        skipkeys: Omit specific fields.
     """
 
     handles: Optional[str] = None
     dates: Optional[str] = None
+    filter: Optional[str] = None
+    rules: Optional[str] = None
     events: Optional[str] = None
     event_classes: Optional[str] = None
     ratings: bool = False
     discard_empty: bool = True
+    locale: Optional[str] = None
+    page: Optional[int] = Field(None, ge=0)
+    pagesize: Optional[int] = Field(None, gt=0)
+    strip: Optional[bool] = None
+    keys: Optional[str] = None
+    skipkeys: Optional[str] = None
