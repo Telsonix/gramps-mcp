@@ -37,12 +37,30 @@ class EntityType(str, Enum):
     REPOSITORY = "repository"
     NOTE = "note"
 
+    @classmethod
+    def _missing_(cls, value: object):
+        """Allow case-insensitive lookup."""
+        if isinstance(value, str):
+            for member in cls:
+                if member.value == value.lower():
+                    return member
+        return None
+
 
 class GetEntityType(str, Enum):
     """Entity types that support detailed get operations."""
 
     PERSON = "person"
     FAMILY = "family"
+
+    @classmethod
+    def _missing_(cls, value: object):
+        """Allow case-insensitive lookup."""
+        if isinstance(value, str):
+            for member in cls:
+                if member.value == value.lower():
+                    return member
+        return None
 
 
 class SimpleFindParams(BaseModel):
