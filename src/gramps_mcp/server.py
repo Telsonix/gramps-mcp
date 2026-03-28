@@ -138,281 +138,468 @@ logger = logging.getLogger(__name__)
 
 # Tool registry - single source of truth for all tools
 TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
-    # Search & Retrieval Tools
+    # ========================================================================
+    # Search & Retrieval Tools (3 tools)
+    # ========================================================================
     "find_type": {
         "description": (
-            "Search any entity type using GQL - read gql://documentation "
-            "resource first to understand syntax"
+            "Search for any genealogy record type using Gramps Query Language (GQL). "
+            "REQUIRED: type (person/family/event/place/source/citation/media/repository/note), "
+            "gql (GQL filter expression). OPTIONAL: max_results (default 20). "
+            "Example: type='person', gql='surname=\"Smith\" AND birth_year > 1800'. "
+            "Returns list of matching records with handles and gramps_ids. "
+            "Read gql://documentation resource first to understand GQL syntax."
         ),
         "schema": SimpleFindParams,
         "handler": find_type_tool,
     },
     "find_anything": {
         "description": (
-            "Text search across all record types - matches literal text "
-            "within records, not logical combinations"
+            "Perform a plain text search across ALL genealogy records (people, families, "
+            "events, places, sources, citations, notes, media, repositories). "
+            "Matches literal text strings anywhere in record fields. "
+            "REQUIRED: query (plain text string). OPTIONAL: max_results (default 20). "
+            "Use this for quick keyword searches when you want to find records containing "
+            "a specific name, place, or keyword without learning GQL syntax. "
+            "Returns handles and gramps_ids of all matching records."
         ),
         "schema": SimpleSearchParams,
         "handler": find_anything_tool,
     },
     "get_type": {
-        "description": "Get full details for person or family by handle or gramps_id",
+        "description": (
+            "Get comprehensive details for a person or family record by identifier. "
+            "REQUIRED: type ('person' or 'family'), and either handle (internal key) "
+            "or gramps_id (user-facing ID like 'I0001' or 'F0001', not both). "
+            "Returns all details: names, relationships, events, dates, notes, media, "
+            "citations. Use this after find_type/find_anything to get full record data."
+        ),
         "schema": SimpleGetParams,
         "handler": get_type_tool,
     },
-    # Data Management Tools
+    # ========================================================================
+    # Data Management Tools — Create/Update (10 tools)
+    # ========================================================================
     "create_person": {
         "description": (
-            "Create or update a person record. "
-            "primary_name accepts a plain string ('John Smith') — last word becomes "
-            "surname — or a full Name object. "
-            "gender accepts 'Male', 'Female', 'Unknown' (or integers 1/0/2). "
-            "Example: primary_name='Mary O\'Connor', gender='Female'."
+            "Create a new person record or update an existing one. "
+            "REQUIRED: primary_name (plain string like 'John Smith' or full Name object), "
+            "gender ('Male'/'Female'/'Unknown' or 0/1/2). "
+            "OPTIONAL: handle (for updates; omit for new), alternate_names, event_ref_list, "
+            "family_list, parent_family_list, urls. "
+            "Plain strings for names are auto-converted: last word becomes surname. "
+            "Returns new/updated person's handle and gramps_id. "
+            "Use create_family AFTER creating person to attach to families."
         ),
         "schema": PersonData,
         "handler": create_person_tool,
     },
     "create_family": {
         "description": (
-            "Create or update a family unit. "
-            "Provide father_handle and/or mother_handle (internal handles, not Gramps IDs). "
-            "Use child_handles=['handle1','handle2'] for children — automatically "
-            "converted to child_ref_list. Omit handle to create new."
+            "Create a new family unit or update an existing one. "
+            "OPTIONAL: handle (for updates; omit for new), father_handle, mother_handle "
+            "(internal handles from get_type results), child_handles (list of person handles). "
+            "Use child_handles=['h1','h2'] for convenient child assignment "
+            "(auto-converted to API format). "
+            "Returns family's handle and gramps_id. "
+            "Always create/reference persons BEFORE adding them to families."
         ),
         "schema": FamilySaveParams,
         "handler": create_family_tool,
     },
     "create_event": {
         "description": (
-            "Create or update a life event. "
-            "type is a string: 'Birth', 'Death', 'Marriage', 'Burial', etc. "
-            "date accepts a plain string ('1850', '1850-06', '1850-06-15') "
-            "or a full Gramps Date object. "
-            "place is the internal place handle (not Gramps ID). "
-            "citation_list is optional."
+            "Create a new life event (Birth, Death, Marriage, Burial, etc.) or update one. "
+            "REQUIRED: type (event type string). "
+            "OPTIONAL: handle (for updates), date (plain '1850', '1850-06', '1850-06-15' "
+            "or Gramps Date object), description, place (place handle from get_type), "
+            "citation_list (handles of sources), note_list (note handles). "
+            "Use get_types tool to see all valid event types. "
+            "Returns event's handle and gramps_id. "
+            "Link events to people via person.event_ref_list."
         ),
         "schema": EventSaveParams,
         "handler": create_event_tool,
     },
     "create_place": {
         "description": (
-            "Create or update a geographic location. "
-            "name accepts a plain string ('London') or {\"value\": \"London\"}. "
-            "place_type is a string: 'City', 'Country', 'County', 'State', "
-            "'Province', 'Region', 'Parish', 'Town', 'Village', etc. "
-            "Use get_types tool for the full list."
+            "Create a new geographic location or update an existing one. "
+            "REQUIRED: place_type (e.g. 'City', 'Country', 'County', 'State', 'Town'). "
+            "OPTIONAL: handle (for updates), name (plain 'London' or {\"value\": \"London\"}), "
+            "code, lat (latitude), long (longitude), alt_names, urls, citation_list, "
+            "note_list. "
+            "Use get_types tool to see all valid place types. "
+            "Returns place's handle and gramps_id. "
+            "Must exist before linking to events."
         ),
         "schema": PlaceSaveParams,
         "handler": create_place_tool,
     },
     "create_source": {
         "description": (
-            "Create or update a source document (book, website, archive record, etc.). "
-            "Required: title. Optional: author, pubinfo (publication info), "
-            "reporef_list (list of repository references)."
+            "Create a new source document (book, website, archive record, etc.) or update one. "
+            "REQUIRED: title (name of the source). "
+            "OPTIONAL: handle (for updates), author, pubinfo (publication info), "
+            "reporef_list (repository references). "
+            "Returns source's handle and gramps_id. "
+            "Must exist before creating citations that reference it. "
+            "Base unit for genealogy research — each source can link to multiple citations."
         ),
         "schema": SourceSaveParams,
         "handler": create_source_tool,
     },
     "create_citation": {
         "description": (
-            "Create or update a citation linking a source to a claim. "
-            "Required: source_handle (internal handle of the source). "
-            "Optional: page (page/location in source), "
-            "date as plain string ('1850') or Gramps Date object."
+            "Create a new citation (specific reference within a source) or update one. "
+            "REQUIRED: source_handle (internal handle of the source document). "
+            "OPTIONAL: handle (for updates), page (page number or location), "
+            "date (plain string or Gramps Date object). "
+            "Citations connect sources to claims (people, events, facts). "
+            "Returns citation's handle and gramps_id. "
+            "Always create source BEFORE creating citations."
         ),
         "schema": CitationData,
         "handler": create_citation_tool,
     },
     "create_note": {
         "description": (
-            "Create or update a textual note. "
-            "Required: text (plain string content), type (note type string, "
-            "e.g. 'General', 'Research', 'Source', 'To Do', 'Citation'). "
-            "text is automatically wrapped in StyledText format for the API."
+            "Create a new textual note or update an existing one. "
+            "REQUIRED: text (note content as plain string), type (note type string, "
+            "e.g. 'General', 'Research', 'Source', 'To Do'). "
+            "OPTIONAL: handle (for updates). "
+            "Text is auto-wrapped in Gramps' StyledText format. "
+            "Returns note's handle and gramps_id. "
+            "Use for research notes, citations, or any supplementary text attached to records."
         ),
         "schema": NoteSaveParams,
         "handler": create_note_tool,
     },
     "create_media": {
         "description": (
-            "Create or update a media object record (metadata only — "
-            "use upload_media_file to also attach a file). "
-            "Required: desc (description string). "
-            "Optional: path (file path or URL), mime (MIME type e.g. 'image/jpeg'), "
-            "date as plain string or Gramps Date object."
+            "Create a new media record (photo, document, etc. metadata) or update one. "
+            "REQUIRED: desc (description of the media). "
+            "OPTIONAL: handle (for updates), path (file path or URL), mime (MIME type), "
+            "date (when media was created), citation_list, note_list. "
+            "This creates the METADATA only — use upload_media_file to also store the actual file. "
+            "Returns media's handle and gramps_id. "
+            "Useful for organizing photos, documents, artifacts in the tree."
         ),
         "schema": MediaSaveParams,
         "handler": create_media_tool,
     },
     "create_repository": {
         "description": (
-            "Create or update a repository (archive, library, church, etc.). "
-            "Required: name (string), type (string e.g. 'Archive', 'Library', "
-            "'Church', 'National Archive', 'Web', 'Unknown'). "
-            "Optional: urls list."
+            "Create a new repository (archive, library, church, website, etc.) or update one. "
+            "REQUIRED: name (repository name), type (repository type string, "
+            "e.g. 'Archive', 'Library', 'Church', 'National Archive', 'Web'). "
+            "OPTIONAL: handle (for updates), urls. "
+            "Returns repository's handle and gramps_id. "
+            "Repositories hold sources and help organize your research locations."
         ),
         "schema": RepositoryData,
         "handler": create_repository_tool,
     },
-    # Delete Tools
+    # ========================================================================
+    # Delete Tools (10 tools)
+    # ========================================================================
     "delete_person": {
-        "description": "Delete a person by handle",
+        "description": (
+            "Delete a person record and all linked data. "
+            "REQUIRED: Either handle (internal key) or gramps_id (e.g. 'I0001'), not both. "
+            "WARNING: Deletion is permanent and cascades to related records. "
+            "Use find_type or find_anything first to locate the record, then get_type "
+            "to verify it's correct before deleting."
+        ),
         "schema": DeleteParams,
         "handler": delete_person_tool,
     },
     "delete_family": {
-        "description": "Delete a family by handle",
+        "description": (
+            "Delete a family unit and its relationships. "
+            "REQUIRED: Either handle or gramps_id (e.g. 'F0001'), not both. "
+            "WARNING: Permanent deletion. Family relationships are removed but individuals "
+            "are preserved. Verify with get_type before deleting."
+        ),
         "schema": DeleteParams,
         "handler": delete_family_tool,
     },
     "delete_event": {
-        "description": "Delete an event by handle",
+        "description": (
+            "Delete an event record. "
+            "REQUIRED: Either handle or gramps_id (e.g. 'E0012'), not both. "
+            "WARNING: Permanent deletion and removes the event from all associated people. "
+            "Use get_type first to confirm which event you're deleting."
+        ),
         "schema": DeleteParams,
         "handler": delete_event_tool,
     },
     "delete_note": {
-        "description": "Delete a note by handle",
+        "description": (
+            "Delete a note record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion removes the note from all associated records."
+        ),
         "schema": DeleteParams,
         "handler": delete_note_tool,
     },
     "delete_citation": {
-        "description": "Delete a citation by handle",
+        "description": (
+            "Delete a citation record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion. Citations link sources to specific claims."
+        ),
         "schema": DeleteParams,
         "handler": delete_citation_tool,
     },
     "delete_source": {
-        "description": "Delete a source by handle",
+        "description": (
+            "Delete a source document record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion cascades to all citations referencing this source."
+        ),
         "schema": DeleteParams,
         "handler": delete_source_tool,
     },
     "delete_place": {
-        "description": "Delete a place by handle",
+        "description": (
+            "Delete a place record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion removes place from all associated events."
+        ),
         "schema": DeleteParams,
         "handler": delete_place_tool,
     },
     "delete_repository": {
-        "description": "Delete a repository by handle",
+        "description": (
+            "Delete a repository record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion."
+        ),
         "schema": DeleteParams,
         "handler": delete_repository_tool,
     },
     "delete_media": {
-        "description": "Delete a media item by handle",
+        "description": (
+            "Delete a media record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion removes media from all associated records."
+        ),
         "schema": DeleteParams,
         "handler": delete_media_tool,
     },
-    # Analysis Tools
+    # ========================================================================
+    # Analysis & Lookup Tools (12 tools)
+    # ========================================================================
     "tree_stats": {
         "description": (
-            "Get information about a specific tree including statistics "
-            "(counts of people, families, events, etc.)"
+            "Get statistics about the entire family tree: total counts of people, families, "
+            "events, places, sources, citations, media, notes, repositories. "
+            "OPTIONAL: include_statistics (default true). "
+            "Returns summarized tree information useful for understanding tree size and scope. "
+            "No parameters needed for basic usage."
         ),
         "schema": TreeInfoParams,
         "handler": get_tree_info_tool,
     },
     "get_descendants": {
         "description": (
-            "Find all descendants of a person - WARNING: Very token-heavy "
-            "operation, minimize generations (default: 5)"
+            "Find all descendants of a person down to N generations. "
+            "REQUIRED: gramps_id or handle of starting person. "
+            "OPTIONAL: max_generations (default 5, be careful with higher values — "
+            "very large trees can overflow response). "
+            "WARNING: This is a VERY token-heavy operation. Use sparingly. "
+            "Returns hierarchical tree of all descendants. "
+            "Use for family reunion planning, inheritance tracking, or tree analysis."
         ),
         "schema": DescendantsParams,
         "handler": get_descendants_tool,
     },
     "get_ancestors": {
         "description": (
-            "Find all ancestors of a person - WARNING: Very token-heavy "
-            "operation, minimize generations (default: 5)"
+            "Find all ancestors of a person going back N generations. "
+            "REQUIRED: gramps_id or handle of starting person. "
+            "OPTIONAL: max_generations (default 5). "
+            "WARNING: VERY token-heavy operation. Keep generations low. "
+            "Returns hierarchical tree of all ancestors. "
+            "Use for lineage research, identifying distant cousins, or heritage analysis."
         ),
         "schema": AncestorsParams,
         "handler": get_ancestors_tool,
     },
     "recent_changes": {
-        "description": "Get recent changes/modifications to the family tree",
+        "description": (
+            "Get a log of recent changes/modifications to the family tree. "
+            "OPTIONAL: pagesize, page number for pagination. "
+            "Shows what records were created, updated, or modified and when. "
+            "Useful for tracking tree modifications, auditing changes, or resuming work."
+        ),
         "schema": TransactionHistoryParams,
         "handler": get_recent_changes_tool,
     },
     "get_relations": {
-        "description": "Find the relationship between two people (e.g., cousins, uncle/nephew)",
+        "description": (
+            "Calculate the relationship between two specific people. "
+            "REQUIRED: Two person identifiers (gramps_id or handle). "
+            "Example output: 'Second cousin once removed', 'Uncle', 'Brother-in-law'. "
+            "Returns single relationship description. "
+            "Use this to understand family connections and verify relationships in the tree."
+        ),
         "schema": RelationParams,
         "handler": get_relations_tool,
     },
     "get_relations_all": {
-        "description": "Find ALL possible relationship paths between two people",
+        "description": (
+            "Find ALL possible relationship paths between two people. "
+            "REQUIRED: Two person identifiers (gramps_id or handle). "
+            "Returns multiple relationship descriptions if people are related through "
+            "different paths. "
+            "Use for understanding complex family connections (e.g., both cousins AND "
+            "in-laws through different ancestors)."
+        ),
         "schema": RelationParams,
         "handler": get_relations_all_tool,
     },
-    # Living & Facts Tools
     "get_living": {
-        "description": "Check if a person is considered living (for privacy purposes)",
+        "description": (
+            "Check if a person is considered living for privacy purposes. "
+            "REQUIRED: gramps_id or handle of person. "
+            "OPTIONAL: living proxy settings, age parameters. "
+            "Returns whether person should be treated as living. "
+            "Useful for privacy management — living people often have restricted info."
+        ),
         "schema": LivingParams,
         "handler": get_living_tool,
     },
     "get_facts": {
-        "description": "Get computed facts and statistics about the family tree",
+        "description": (
+            "Get computed facts and statistics about the family tree, optionally filtered "
+            "by person (descendants, ancestors, common ancestors) or location. "
+            "OPTIONAL: gramps_id/handle (for person-specific facts), living proxy policy, "
+            "person filter (Descendants/Ancestors/CommonAncestor), private flag. "
+            "Returns interesting derived facts: oldest people, most events, median age, etc. "
+            "Use to analyze tree patterns and answer 'who' questions."
+        ),
         "schema": FactsParams,
         "handler": get_facts_tool,
     },
-    # Tag Tools
+    # ========================================================================
+    # Tag Tools (3 tools)
+    # ========================================================================
     "find_tags": {
-        "description": "Find/list all tags in the database",
+        "description": (
+            "List all tags in the database with optional pagination. "
+            "OPTIONAL: page, pagesize (for pagination). "
+            "Tags are labels for organizing records. "
+            "Returns list of all available tags with names, colors, and priorities. "
+            "Use before create_tag to check existing tags and avoid duplicates."
+        ),
         "schema": TagSearchParams,
         "handler": find_tags_tool,
     },
     "create_tag": {
-        "description": "Create or update a tag for organizing records",
+        "description": (
+            "Create a new tag or update an existing one. "
+            "REQUIRED: name (tag label, e.g. 'Needs Research', 'DNA Match', 'Historical'). "
+            "OPTIONAL: handle (for updates), color (hex color #RRGGBB), priority (integer). "
+            "Returns tag's handle and gramps_id. "
+            "Tags help organize and categorize records across the entire tree."
+        ),
         "schema": TagSaveParams,
         "handler": create_tag_tool,
     },
     "delete_tag": {
-        "description": "Delete a tag by handle",
+        "description": (
+            "Delete a tag record. "
+            "REQUIRED: Either handle or gramps_id, not both. "
+            "WARNING: Permanent deletion removes tag from all records it was assigned to."
+        ),
         "schema": DeleteParams,
         "handler": delete_tag_tool,
     },
-    # Timeline Tools
+    # ========================================================================
+    # Timeline Tools (2 tools)
+    # ========================================================================
     "get_people_timeline": {
-        "description": "Get a timeline of events for a group of people",
+        "description": (
+            "Get a chronological timeline of all events for a list of people. "
+            "REQUIRED: list of gramps_ids or handles of people. "
+            "OPTIONAL: date range, event types, include ratings/citations. "
+            "Returns events sorted by date for all specified people. "
+            "Use for understanding life sequences, migration patterns, family stories."
+        ),
         "schema": PeopleTimelineParams,
         "handler": get_people_timeline_tool,
     },
     "get_families_timeline": {
-        "description": "Get a timeline of events for a group of families",
+        "description": (
+            "Get a chronological timeline of all events for a list of families. "
+            "REQUIRED: list of family gramps_ids or handles. "
+            "OPTIONAL: date range, event types, include ratings. "
+            "Returns events sorted by date for family units. "
+            "Use for understanding family history progression and significant milestones."
+        ),
         "schema": FamiliesTimelineParams,
         "handler": get_families_timeline_tool,
     },
-    # Media File Tools
+    # ========================================================================
+    # Media File Tools (3 tools)
+    # ========================================================================
     "get_media_file": {
-        "description": "Get information about a media file (metadata and download URL)",
+        "description": (
+            "Get metadata about a media file (size, type, path). "
+            "REQUIRED: Either handle or gramps_id (e.g. 'O0100'), not both. "
+            "Returns file metadata and URL for local download. "
+            "Use after find_type(type='media') or find_anything to get file info. "
+            "Use this to research what media exists; use upload_media_file to add new media."
+        ),
         "schema": MediaGetParams,
         "handler": get_media_file_tool,
     },
     "upload_media_file": {
         "description": (
-            "Upload a new media file from the local filesystem - "
-            "creates a new media object with the file content"
+            "Upload and attach a new media file from the local filesystem. "
+            "REQUIRED: file_path (absolute path like '/home/user/photos/grandma.jpg'). "
+            "OPTIONAL: description (for creating new media object). "
+            "Creates new media object with the uploaded file attached. "
+            "Returns media's handle and gramps_id. "
+            "Supports images (jpg, png, gif), PDFs, and other media types."
         ),
         "schema": MediaFileUploadParams,
         "handler": upload_media_file_tool,
     },
     "update_media_file": {
         "description": (
-            "Update an existing media object's file from the local filesystem - "
-            "replaces the file content for an existing media object"
+            "Replace the file attached to an existing media object. "
+            "REQUIRED: handle (media object identifier), "
+            "file_path (absolute path to new file). "
+            "Keeps the media object but swaps out its file. "
+            "Use for correcting image quality, updating documents, etc."
         ),
         "schema": MediaFileUpdateParams,
         "handler": update_media_file_tool,
     },
-    # Event & Type Tools
+    # ========================================================================
+    # Event & Type Reference Tools (2 tools)
+    # ========================================================================
     "get_event_span": {
         "description": (
-            "Calculate time span between two events - useful for 'how old was X when Y happened' queries"
+            "Calculate the time span (duration) between two events. "
+            "REQUIRED: Two event handles/gramps_ids. "
+            "OPTIONAL: as_age (return as person's age), precision (1-3 significant levels). "
+            "Returns time difference. Perfect for 'How old was X when Y happened' questions. "
+            "Use for biographical analysis and timeline understanding."
         ),
         "schema": EventSpanParams,
         "handler": get_event_span_tool,
     },
     "get_types": {
         "description": (
-            "Get all valid type values (event types, name types, place types, etc.) - "
-            "reference for creating records"
+            "Get all valid enumerated type values used in the tree: "
+            "event types (Birth, Death, Marriage, Burial, etc.), "
+            "place types (City, Country, Region, etc.), name types, relationship types. "
+            "RETURNS: Dictionary of all type names and their descriptions. "
+            "Use this as a reference when creating new records to understand valid options. "
+            "No parameters required."
         ),
         "schema": EmptyParams,
         "handler": get_types_tool,
