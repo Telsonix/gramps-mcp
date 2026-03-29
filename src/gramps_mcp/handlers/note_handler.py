@@ -54,7 +54,13 @@ async def format_note(client, tree_id: str, handle: str) -> str:
 
         gramps_id = note_data.get("gramps_id")
         note_type = note_data.get("type")
-        text = note_data.get("text", {}).get("string")
+        
+        # Extract text value - may be a dict with "string" key or a plain string
+        text_value = note_data.get("text", "")
+        if isinstance(text_value, dict):
+            text = text_value.get("string", "")
+        else:
+            text = str(text_value) if text_value else ""
 
         if not text:
             return ""
