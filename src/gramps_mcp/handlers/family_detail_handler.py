@@ -214,9 +214,15 @@ async def format_family_detail(client, tree_id: str, handle: str) -> str:
                 )
                 note_type = note_data.get("type", "")
                 note_id = note_data.get("gramps_id", "")
-                note_text = note_data.get("text", "")[:50]  # First 50 chars
-                if len(note_data.get("text", "")) > 50:
+                # Extract string value from text field (may be dict or string)
+                text_value = note_data.get("text", "")
+                if isinstance(text_value, dict) and "string" in text_value:
+                    text_value = text_value["string"]
+                text_str = str(text_value) if text_value else ""
+                note_text = text_str[:50]  # First 50 chars
+                if len(text_str) > 50:
                     note_text += "..."
+
                 result += f"- {note_type}: {note_text} ({note_id})\n"
             except Exception:
                 result += f"- Note ({note_handle})\n"
