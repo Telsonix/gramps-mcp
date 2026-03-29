@@ -17,8 +17,8 @@
 """
 Basic search MCP tools for genealogy operations.
 
-This module contains 8 basic search tools for finding people, families, events,
-places, sources, citations, media, and full-text search across all entity types.
+Search tools use compact summary formatters (zero extra API calls per result).
+Use get_entity to retrieve full detail for a specific record.
 """
 
 import functools
@@ -29,15 +29,7 @@ from mcp.types import TextContent
 
 from ..client import GrampsAPIError, GrampsWebAPIClient
 from ..config import get_settings
-from ..handlers.citation_handler import format_citation
-from ..handlers.event_handler import format_event
-from ..handlers.family_handler import format_family
-from ..handlers.media_handler import format_media
-from ..handlers.note_handler import format_note
-from ..handlers.person_handler import format_person
-from ..handlers.place_handler import format_place
-from ..handlers.repository_handler import format_repository
-from ..handlers.source_handler import format_source
+from ..handlers.summary_handler import SUMMARY_FORMATTERS, format_summary
 from ..models.api_calls import ApiCalls
 from ..models.parameters.base_params import BaseGetMultipleParams
 from ..models.parameters.citation_params import GetCitationsParams
@@ -86,60 +78,24 @@ def with_client(func: Callable) -> Callable:
     return wrapper
 
 
-async def format_search_result_by_type(client, item: Dict) -> str:
+def format_search_result_by_type(item: Dict) -> str:
     """
-    Format search result using appropriate handler based on object type.
+    Format a search result using the appropriate summary formatter.
+
+    Uses pre-fetched object data from the search response — no extra API calls.
 
     Args:
-        client: Gramps API client instance
-        item (Dict): Search result item containing object_type and object data
+        item (Dict): Search result item containing object_type and object data.
 
     Returns:
-        str: Formatted result string using the appropriate handler
+        str: Compact summary string (1-3 lines).
     """
     obj_type = item.get("object_type", "").lower()
     obj = item.get("object", {})
-    handle = obj.get("handle", "")
-
-    if not handle:
-        return f"• **{obj_type.title()} record** (No handle available)\n\n"
-
-    # Get tree_id from settings
-    settings = get_settings()
-    tree_id = settings.gramps_tree_id
-
-    try:
-        if obj_type == "person":
-            return await format_person(client, tree_id, handle)
-        elif obj_type == "family":
-            return await format_family(client, tree_id, handle)
-        elif obj_type == "event":
-            return await format_event(client, tree_id, handle)
-        elif obj_type == "place":
-            return await format_place(client, tree_id, handle)
-        elif obj_type == "source":
-            return await format_source(client, tree_id, handle)
-        elif obj_type == "media":
-            return await format_media(client, tree_id, handle)
-        elif obj_type == "citation":
-            return await format_citation(client, tree_id, handle)
-        elif obj_type == "note":
-            return await format_note(client, tree_id, handle)
-        else:
-            gramps_id = obj.get("gramps_id", "N/A")
-            title = (
-                obj.get("title", "")
-                or obj.get("desc", "")
-                or f"{obj_type.title()} record"
-            )
-            return f"• **{title}** ({obj_type.title()} - ID: {gramps_id})\n\n"
-    except Exception as e:
-        logger.debug(f"Error formatting {obj_type} result: {e}")
-        gramps_id = obj.get("gramps_id", "N/A")
-        return (
-            f"• **{obj_type.title()} record** (ID: {gramps_id}) - "
-            "Error formatting details\n\n"
-        )
+    if not obj:
+        gramps_id = item.get("gramps_id", "N/A")
+        return f"{obj_type.title()} - {gramps_id}\n"
+    return format_summary(obj_type, obj)
 
 
 async def _search_entities(
@@ -148,10 +104,12 @@ async def _search_entities(
     params_class,
     api_call: ApiCalls,
     entity_type: str,
-    format_handler,
+    summary_formatter,
 ) -> List[TextContent]:
     """
     Generic search function for all entity types.
+
+    Uses summary formatters — zero extra API calls per result.
 
     Args:
         client: Gramps API client instance
@@ -159,7 +117,7 @@ async def _search_entities(
         params_class: Pydantic model class for parameter validation
         api_call: ApiCalls enum value for the API endpoint
         entity_type: Human-readable entity type for error messages
-        format_handler: Async function to format individual results
+        summary_formatter: Pure function (obj_dict) -> str for compact output
 
     Returns:
         List of TextContent with formatted search results
@@ -202,21 +160,15 @@ async def _search_entities(
 
             formatted_results = header
 
-            # Process each result with the appropriate handler
+            # Reason: use the object already in the list response — no re-fetch
             results_to_display = (
                 results[: params.pagesize] if params.pagesize else results
             )
             for item in results_to_display:
                 if not isinstance(item, dict):
                     continue
-
-                # Extract object from search result wrapper if needed
                 obj = item.get("object", item)
-                handle = obj.get("handle", "")
-
-                if handle:
-                    item_formatted = await format_handler(client, tree_id, handle)
-                    formatted_results += item_formatted
+                formatted_results += summary_formatter(obj)
 
         return [TextContent(type="text", text=formatted_results)]
 
@@ -253,7 +205,7 @@ async def find_person_tool(client, arguments: Dict) -> List[TextContent]:
         BaseGetMultipleParams,
         ApiCalls.GET_PEOPLE,
         "people",
-        format_person,
+        SUMMARY_FORMATTERS["person"],
     )
 
 
@@ -270,7 +222,7 @@ async def find_family_tool(client, arguments: Dict) -> List[TextContent]:
         BaseGetMultipleParams,
         ApiCalls.GET_FAMILIES,
         "families",
-        format_family,
+        SUMMARY_FORMATTERS["family"],
     )
 
 
@@ -285,7 +237,7 @@ async def find_event_tool(client, arguments: Dict) -> List[TextContent]:
         EventSearchParams,
         ApiCalls.GET_EVENTS,
         "events",
-        format_event,
+        SUMMARY_FORMATTERS["event"],
     )
 
 
@@ -300,7 +252,7 @@ async def find_place_tool(client, arguments: Dict) -> List[TextContent]:
         PlaceSearchParams,
         ApiCalls.GET_PLACES,
         "places",
-        format_place,
+        SUMMARY_FORMATTERS["place"],
     )
 
 
@@ -315,7 +267,7 @@ async def find_source_tool(client, arguments: Dict) -> List[TextContent]:
         SourceSearchParams,
         ApiCalls.GET_SOURCES,
         "sources",
-        format_source,
+        SUMMARY_FORMATTERS["source"],
     )
 
 
@@ -330,7 +282,7 @@ async def find_repository_tool(client, arguments: Dict) -> List[TextContent]:
         RepositoriesParams,
         ApiCalls.GET_REPOSITORIES,
         "repositories",
-        format_repository,
+        SUMMARY_FORMATTERS["repository"],
     )
 
 
@@ -345,7 +297,7 @@ async def find_media_tool(client, arguments: Dict) -> List[TextContent]:
         MediaSearchParams,
         ApiCalls.GET_MEDIA,
         "media files",
-        format_media,
+        SUMMARY_FORMATTERS["media"],
     )
 
 
@@ -361,7 +313,7 @@ async def find_citation_tool(client, arguments: Dict) -> List[TextContent]:
         GetCitationsParams,
         ApiCalls.GET_CITATIONS,
         "citations",
-        format_citation,
+        SUMMARY_FORMATTERS["citation"],
     )
 
 
@@ -371,7 +323,7 @@ async def find_note_tool(client, arguments: Dict) -> List[TextContent]:
     Search for notes and research notes.
     """
     return await _search_entities(
-        client, arguments, NotesParams, ApiCalls.GET_NOTES, "notes", format_note
+        client, arguments, NotesParams, ApiCalls.GET_NOTES, "notes", SUMMARY_FORMATTERS["note"]
     )
 
 
@@ -524,7 +476,7 @@ async def find_anything_tool(client, arguments) -> List[TextContent]:
                 if not isinstance(item, dict):
                     continue
 
-                result_formatted = await format_search_result_by_type(client, item)
+                result_formatted = format_search_result_by_type(item)
                 formatted_results += result_formatted
 
         return [TextContent(type="text", text=formatted_results)]

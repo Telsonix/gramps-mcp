@@ -15,321 +15,299 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Family data handler for Gramps MCP operations.
-
-Provides clean, direct formatting of family data from handles.
+Family detail handler for Gramps MCP operations.
 """
-
-import logging
 
 from ..models.api_calls import ApiCalls
 from .date_handler import format_date
 from .place_handler import format_place
 
-logger = logging.getLogger(__name__)
-
 
 async def format_family(client, tree_id: str, handle: str) -> str:
-    """
-    Format family data with members and basic details.
+    """Format comprehensive family data with timeline and citations."""
+    # Get family data
+    family_data = await client.make_api_call(
+        ApiCalls.GET_FAMILY, tree_id=tree_id, handle=handle, params={"extend": "all"}
+    )
 
-    Args:
-        client: Gramps API client instance
-        tree_id (str): Family tree identifier
-        handle (str): Family handle
+    # Get family timeline
+    timeline_data = await client.make_api_call(
+        ApiCalls.GET_FAMILY_TIMELINE,
+        tree_id=tree_id,
+        handle=handle,
+        # No params needed for family timeline
+    )
 
-    Returns:
-        str: Formatted family string with members and details
-    """
-    if not handle:
-        return "• **Family**\n  No handle provided\n\n"
+    result = "=== FAMILY DETAILS ===\n"
 
-    try:
-        # Get family data with extended information
-        family_data = await client.make_api_call(
-            ApiCalls.GET_FAMILY,
-            tree_id=tree_id,
-            handle=handle,
-            params={"extend": "all"},
+    # Extract basic info
+    gramps_id = family_data.get("gramps_id", "")
+    result += f"Family {gramps_id} - [{handle}]\n"
+
+    # Parents section
+    result += "\nPARENTS:\n"
+    extended = family_data.get("extended", {})
+
+    # Father
+    father = extended.get("father", {})
+    if father:
+        father_name = _extract_person_name(father)
+        father_gender = _get_gender_letter(father.get("gender", 2))
+        father_id = father.get("gramps_id", "")
+        father_handle = father.get("handle", "")
+        father_birth, father_death = await _get_birth_death_dates(
+            client, tree_id, father
         )
-        if not family_data:
-            return f"• **Family {handle}**\n  Family not found\n\n"
-
-        gramps_id = family_data.get("gramps_id", "")
-        result = ""
-
-        # First line: Father: Name (Gender) - ID | Mother: Name (Gender) - ID
-        # - FamilyID - [family_handle]
-        family_members = []
-
-        # Get father
-        father_handle = family_data.get("father_handle", "")
+        dates = ", ".join(filter(None, [father_birth, father_death]))
+        line = f"Father: {father_name} ({father_gender}) - {father_id}"
         if father_handle:
-            try:
-                father_data = await client.make_api_call(
-                    ApiCalls.GET_PERSON, tree_id=tree_id, handle=father_handle
-                )
-                if father_data:
-                    father_name = _extract_person_name(father_data)
-                    father_gender = _get_gender_letter(father_data.get("gender", 2))
-                    father_id = father_data.get("gramps_id", "")
-                    family_members.append(
-                        f"Father: {father_name} ({father_gender}) - {father_id} [{father_handle}]"
-                    )
-            except Exception as e:
-                logger.debug(f"Failed to fetch father {father_handle}: {e}")
+            line += f" [{father_handle}]"
+        if dates:
+            line += f" - {dates}"
+        result += line + "\n"
 
-        # Get mother
-        mother_handle = family_data.get("mother_handle", "")
+    # Mother
+    mother = extended.get("mother", {})
+    if mother:
+        mother_name = _extract_person_name(mother)
+        mother_gender = _get_gender_letter(mother.get("gender", 2))
+        mother_id = mother.get("gramps_id", "")
+        mother_handle = mother.get("handle", "")
+        mother_birth, mother_death = await _get_birth_death_dates(
+            client, tree_id, mother
+        )
+        dates = ", ".join(filter(None, [mother_birth, mother_death]))
+        line = f"Mother: {mother_name} ({mother_gender}) - {mother_id}"
         if mother_handle:
+            line += f" [{mother_handle}]"
+        if dates:
+            line += f" - {dates}"
+        result += line + "\n"
+
+    # Children section
+    children = extended.get("children", [])
+    if children:
+        result += "\nCHILDREN:\n"
+        for child in children:
+            child_name = _extract_person_name(child)
+            child_gender = _get_gender_letter(child.get("gender", 2))
+            child_id = child.get("gramps_id", "")
+            child_handle = child.get("handle", "")
+            child_birth, child_death = await _get_birth_death_dates(
+                client, tree_id, child
+            )
+            dates = ", ".join(filter(None, [child_birth, child_death]))
+            line = f"- {child_name} ({child_gender}) - {child_id}"
+            if child_handle:
+                line += f" [{child_handle}]"
+            if dates:
+                line += f" - {dates}"
+            result += line + "\n"
+
+    # Marriage information
+    result += "\nMarried:\n"
+    event_ref_list = family_data.get("event_ref_list", [])
+    for event_ref in event_ref_list:
+        event_handle = event_ref.get("ref", "")
+        if event_handle:
             try:
-                mother_data = await client.make_api_call(
-                    ApiCalls.GET_PERSON, tree_id=tree_id, handle=mother_handle
+                event_data = await client.make_api_call(
+                    ApiCalls.GET_EVENT, tree_id=tree_id, handle=event_handle
                 )
-                if mother_data:
-                    mother_name = _extract_person_name(mother_data)
-                    mother_gender = _get_gender_letter(mother_data.get("gender", 2))
-                    mother_id = mother_data.get("gramps_id", "")
-                    family_members.append(
-                        f"Mother: {mother_name} ({mother_gender}) - {mother_id} [{mother_handle}]"
+                event_type = event_data.get("type", "")
+                if event_type.lower() in ["marriage", "married"]:
+                    event_date = format_date(event_data.get("date", {}))
+                    event_place = await format_place(
+                        client, tree_id, event_data.get("place", ""), inline=True
                     )
-            except Exception as e:
-                logger.debug(f"Failed to fetch mother {mother_handle}: {e}")
+                    result += f"{event_date} - {event_place}\n"
+                    break
+            except Exception:
+                continue
 
-        # First line with family ID and handle
-        if family_members:
-            result += f"{' | '.join(family_members)} - {gramps_id} - [{handle}]\n"
-        else:
-            result += f"{gramps_id} - [{handle}]\n"
+    # Timeline section
+    result += "\nTIMELINE:\n"
+    if timeline_data:
+        for timeline_event in timeline_data:
+            if not isinstance(timeline_event, dict):
+                continue
 
-        # Relationship type
-        relationship_type = family_data.get("type", "")
-        if relationship_type:
-            result += f"Type: {relationship_type}\n"
+            # Basic event info from timeline
+            event_type = timeline_event.get("type", "Unknown")
+            event_id = timeline_event.get("gramps_id", "")
+            role = timeline_event.get("role", "Primary")
+            event_handle = timeline_event.get("handle", "")
 
-        # Marriage and divorce events
-        extended = family_data.get("extended", {})
-        events = extended.get("events", [])
-        event_ref_list = family_data.get("event_ref_list", [])
-
-        for i, event_ref in enumerate(event_ref_list):
-            if i < len(events):
-                event = events[i]
-                event_type = event.get("type", "")
-
-                if event_type.lower() == "marriage":
-                    marriage_date = format_date(event.get("date", {}))
-                    marriage_place = await format_place(
-                        client, tree_id, event.get("place", ""), inline=True
-                    )
-                    if marriage_date or marriage_place:
-                        result += f"Married: {marriage_date}"
-                        if marriage_place:
-                            result += f" - {marriage_place}"
-                        result += "\n"
-
-                elif event_type.lower() == "divorce":
-                    divorce_date = format_date(event.get("date", {}))
-                    divorce_place = await format_place(
-                        client, tree_id, event.get("place", ""), inline=True
-                    )
-                    if divorce_date or divorce_place:
-                        result += f"Divorced: {divorce_date}"
-                        if divorce_place:
-                            result += f" - {divorce_place}"
-                        result += "\n"
-
-        # Children
-        child_ref_list = family_data.get("child_ref_list", [])
-        if child_ref_list:
-            child_names = []
-            for child_ref in child_ref_list:
-                child_handle = child_ref.get("ref", "")
-                if child_handle:
-                    try:
-                        child_data = await client.make_api_call(
-                            ApiCalls.GET_PERSON, tree_id=tree_id, handle=child_handle
-                        )
-                        if child_data:
-                            child_name = _extract_person_name(child_data)
-                            child_gender = _get_gender_letter(
-                                child_data.get("gender", 2)
-                            )
-                            child_id = child_data.get("gramps_id", "")
-                            child_names.append(
-                                f"{child_name} ({child_gender}) - {child_id} [{child_handle}]"
-                            )
-                    except Exception as e:
-                        logger.debug(f"Failed to fetch child {child_handle}: {e}")
-
-            if child_names:
-                result += f"Children: {', '.join(child_names)}\n"
-
-        # Citations (using extended map)
-        citation_list = family_data.get("citation_list", [])
-        if citation_list:
-            ext_citations = extended.get("citations", [])
-            cit_map = {}
-            for c in ext_citations:
-                h = c.get("handle", "")
-                if h:
-                    cit_map[h] = c.get("gramps_id", "")
-            cit_strs = []
-            for h in citation_list:
-                cit_id = cit_map.get(h, "")
-                if cit_id:
-                    cit_strs.append(f"{cit_id} [{h}]")
-                elif h:
-                    cit_strs.append(f"[{h}]")
-            if cit_strs:
-                result += f"Citations: {', '.join(cit_strs)}\n"
-
-        # Tags
-        tag_list = family_data.get("tag_list", [])
-        if tag_list:
-            ext_tags = extended.get("tags", [])
-            tag_map = {}
-            for t in ext_tags:
-                h = t.get("handle", "")
-                if h:
-                    tag_map[h] = t.get("name", "")
-            tag_strs = []
-            for h in tag_list:
-                tag_name = tag_map.get(h, "")
-                tag_str = (tag_name if tag_name else h) + f" [{h}]"
-                tag_strs.append(tag_str)
-            if tag_strs:
-                result += f"Tags: {', '.join(tag_strs)}\n"
-
-        # Attributes
-        attribute_list = family_data.get("attribute_list", [])
-        if attribute_list:
-            attr_strs = [
-                f"{a.get('type', '')}: {a.get('value', '')}"
-                for a in attribute_list
-                if a.get("type") or a.get("value")
-            ]
-            if attr_strs:
-                result += f"Attributes: {'; '.join(attr_strs)}\n"
-
-        # Events (all events with roles)
-        event_list = []
-        for i, event_ref in enumerate(event_ref_list):
-            if i < len(events):
-                event = events[i]
-                event_type = event.get("type", "")
-                event_gramps_id = event.get("gramps_id", "")
-                event_handle_ev = event.get("handle", "")
-
-                # Get role from event_ref
-                role = event_ref.get("role", "") if isinstance(event_ref, dict) else ""
-                if role:
-                    entry = f"{event_type}, {role} ({event_gramps_id})"
-                else:
-                    entry = f"{event_type} ({event_gramps_id})"
-                if event_handle_ev:
-                    entry += f" [{event_handle_ev}]"
-                event_list.append(entry)
-
-        if event_list:
-            result += f"Events: {', '.join(event_list)}\n"
-
-        # Attached media
-        media_list = family_data.get("media_list", [])
-        if media_list:
-            media_ids = []
-            for media_ref in media_list:
-                media_handle = (
-                    media_ref.get("ref", "")
-                    if isinstance(media_ref, dict)
-                    else media_ref
-                )
-                if media_handle:
-                    try:
-                        media_data = await client.make_api_call(
-                            api_call=ApiCalls.GET_MEDIA,
-                            tree_id=tree_id,
-                            handle=media_handle,
-                        )
-                        if media_data:
-                            media_gramps_id = media_data.get("gramps_id", "")
-                            if media_gramps_id:
-                                media_ids.append(
-                                    f"{media_gramps_id} [{media_handle}]"
-                                )
-                    except Exception:
-                        continue
-
-            if media_ids:
-                result += f"Attached media: {', '.join(media_ids)}\n"
-
-        # Attached notes
-        note_list = family_data.get("note_list", [])
-        if note_list:
-            note_ids = []
-            for note_handle in note_list:
+            # Get properly formatted date using format_date function
+            event_date = "date unknown"
+            event_data = None
+            if event_handle:
                 try:
-                    note_data = await client.make_api_call(
-                        api_call=ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
+                    event_data = await client.make_api_call(
+                        ApiCalls.GET_EVENT, tree_id=tree_id, handle=event_handle
                     )
-                    if note_data:
-                        note_gramps_id = note_data.get("gramps_id", "")
-                        if note_gramps_id:
-                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
+                    event_date = format_date(event_data.get("date", {}))
                 except Exception:
-                    continue
+                    # Fallback to timeline date if event fetch fails
+                    event_date = timeline_event.get("date", "date unknown")
 
-            if note_ids:
-                result += f"Attached notes: {', '.join(note_ids)}\n"
+            # Place - use display_name directly from timeline data
+            place_data = timeline_event.get("place", {})
+            place_name = (
+                place_data.get("display_name", "")
+                if isinstance(place_data, dict)
+                else ""
+            )
+            place_part = f"({place_name})" if place_name else "()"
 
-        # LDS Ordinations
-        lds_ord_list = family_data.get("lds_ord_list", [])
-        if lds_ord_list:
-            lds_type_map = {
-                "Baptism": "Baptism",
-                "Endowment": "Endowment",
-                "Sealed to Parents": "Sealed to Parents",
-                "Sealed to Spouse": "Sealed to Spouse",
-                "Confirmation": "Confirmation",
-            }
-            lds_strs = []
-            for lds in lds_ord_list:
-                lds_type = lds.get("type", "")
-                lds_label = lds_type_map.get(lds_type, lds_type)
-                lds_date = format_date(lds.get("date", {}))
-                lds_temple = lds.get("temple", "")
-                lds_status = lds.get("status", "")
-                parts = [lds_label]
-                if lds_date and lds_date != "date unknown":
-                    parts.append(lds_date)
-                if lds_temple:
-                    parts.append(f"Temple: {lds_temple}")
-                if lds_status:
-                    parts.append(f"Status: {lds_status}")
-                lds_strs.append(", ".join(parts))
-            if lds_strs:
-                result += "LDS Ordinations:\n"
-                for s in lds_strs:
-                    result += f"  {s}\n"
+            # Participant info - extract from person data in timeline
+            participant_name = ""
+            participant_id = ""
+            person_data_in_timeline = timeline_event.get("person", {})
 
-        # URLs
-        urls = family_data.get("urls", [])
-        if urls:
-            for url in urls:
-                if isinstance(url, dict):
-                    url_path = url.get("path", "")
-                    url_desc = url.get("description", "")
-                    if url_path:
-                        if url_desc:
-                            result += f"{url_path} - {url_desc}\n"
-                        else:
-                            result += f"{url_path}\n"
+            if person_data_in_timeline:
+                person_data_in_timeline.get("relationship", "")
+                # For family timeline, we might have different relationships
+                given_name = person_data_in_timeline.get("name_given", "")
+                surname = person_data_in_timeline.get("name_surname", "")
+                participant_name = f"{given_name} {surname}".strip()
+                participant_id = person_data_in_timeline.get("gramps_id", "")
 
-        return result + "\n"
+            # Format the timeline entry
+            participant_part = (
+                f", {participant_name} {participant_id}, {role}"
+                if participant_name
+                else f", {role}"
+            )
+            result += (
+                f"- {event_date} {place_part} - {event_id} : "
+                f"{event_type}{participant_part}\n"
+            )
 
-    except Exception as e:
-        logger.debug(f"Failed to format family {handle}: {e}")
-        return f"• **Family {handle}**\n  Error formatting family: {str(e)}\n\n"
+            # Add citations if we have event data - reuse the event_data from above
+            if event_data:
+                try:
+                    citation_list = event_data.get("citation_list", [])
+                    citation_ids = []
+                    for citation_handle in citation_list:
+                        citation_data = await client.make_api_call(
+                            ApiCalls.GET_CITATION,
+                            tree_id=tree_id,
+                            handle=citation_handle,
+                        )
+                        citation_id = citation_data.get("gramps_id", "")
+                        if citation_id:
+                            citation_ids.append(citation_id)
+
+                    if citation_ids:
+                        result += f"  Citations: {', '.join(citation_ids)}\n"
+                except Exception:
+                    pass
+
+    # Re-read extended after timeline loop
+    extended = family_data.get("extended", {})
+
+    # Relationship type
+    relationship_type = family_data.get("type", "")
+    if relationship_type:
+        result += f"\nRelationship type: {relationship_type}\n"
+
+    # Tags
+    tag_list = family_data.get("tag_list", [])
+    if tag_list:
+        ext_tags = extended.get("tags", [])
+        tag_map = {t.get("handle"): t.get("name", "") for t in ext_tags}
+        tag_strs = []
+        for h in tag_list:
+            tag_name = tag_map.get(h, "")
+            tag_strs.append(f"{tag_name} [{h}]" if tag_name else f"[{h}]")
+        if tag_strs:
+            result += f"Tags: {', '.join(tag_strs)}\n"
+
+    # Attributes
+    attribute_list = family_data.get("attribute_list", [])
+    if attribute_list:
+        attr_strs = []
+        for attr in attribute_list:
+            attr_type = attr.get("type", "")
+            if isinstance(attr_type, dict):
+                attr_type = attr_type.get("string", "") or attr_type.get("_class", "")
+            attr_value = attr.get("value", "")
+            if attr_type and attr_value:
+                attr_strs.append(f"{attr_type}: {attr_value}")
+        if attr_strs:
+            result += f"Attributes: {'; '.join(attr_strs)}\n"
+
+    # LDS Ordinations
+    lds_ord_list = family_data.get("lds_ord_list", [])
+    if lds_ord_list:
+        result += "LDS Ordinations:\n"
+        for lds in lds_ord_list:
+            lds_type = lds.get("type", "")
+            lds_date = format_date(lds.get("date", {}))
+            temple = lds.get("temple", "")
+            status = lds.get("status", "")
+            line = f"  {lds_type}"
+            if lds_date:
+                line += f" - {lds_date}"
+            if temple:
+                line += f" @ {temple}"
+            if status:
+                line += f" [{status}]"
+            result += line + "\n"
+
+    # URLs
+    urls = family_data.get("urls", [])
+    if urls:
+        for url in urls:
+            if isinstance(url, dict):
+                url_path = url.get("path", "")
+                url_desc = url.get("description", "")
+                if url_path:
+                    result += f"{url_path}{' - ' + url_desc if url_desc else ''}\n"
+
+    # Attached media section
+    result += "\nAttached media:\n"
+    media_list = family_data.get("media_list", [])
+    if media_list:
+        for media_ref in media_list:
+            media_handle = media_ref.get("ref", "")
+            if media_handle:
+                try:
+                    media_data = await client.make_api_call(
+                        ApiCalls.GET_MEDIA_ITEM, tree_id=tree_id, handle=media_handle
+                    )
+                    media_desc = media_data.get("desc", "")
+                    media_id = media_data.get("gramps_id", "")
+                    result += f"- {media_desc} ({media_id})\n"
+                except Exception:
+                    result += f"- Media ({media_handle})\n"
+
+    # Attached notes section
+    result += "\nAttached notes:\n"
+    note_list = family_data.get("note_list", [])
+    if note_list:
+        for note_handle in note_list:
+            try:
+                note_data = await client.make_api_call(
+                    ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
+                )
+                note_type = note_data.get("type", "")
+                note_id = note_data.get("gramps_id", "")
+                # Extract string value from text field (may be dict or string)
+                text_value = note_data.get("text", "")
+                if isinstance(text_value, dict) and "string" in text_value:
+                    text_value = text_value["string"]
+                text_str = str(text_value) if text_value else ""
+                note_text = text_str[:50]  # First 50 chars
+                if len(text_str) > 50:
+                    note_text += "..."
+
+                result += f"- {note_type}: {note_text} ({note_id})\n"
+            except Exception:
+                result += f"- Note ({note_handle})\n"
+
+    return result
 
 
 def _extract_person_name(person_data: dict) -> str:
@@ -339,11 +317,61 @@ def _extract_person_name(person_data: dict) -> str:
         given_name = primary_name.get("first_name", "")
         surname_list = primary_name.get("surname_list", [])
         surname = surname_list[0].get("surname", "") if surname_list else ""
-        full_name = f"{given_name} {surname}".strip()
-        return full_name if full_name else ""
-    return ""
+        return f"{given_name} {surname}".strip()
+    return "Unknown"
 
 
 def _get_gender_letter(gender: int) -> str:
     """Convert gender number to letter."""
     return {0: "F", 1: "M", 2: "U"}.get(gender, "U")
+
+
+async def _get_birth_death_dates(client, tree_id: str, person_data: dict) -> tuple:
+    """Get birth and death dates with places for a person."""
+    person_handle = person_data.get("handle", "")
+    if not person_handle:
+        return "", ""
+
+    try:
+        # Get person with extended data to access events
+        full_person_data = await client.make_api_call(
+            ApiCalls.GET_PERSON,
+            tree_id=tree_id,
+            handle=person_handle,
+            params={"extend": "all"},
+        )
+
+        extended = full_person_data.get("extended", {})
+        events = extended.get("events", [])
+
+        birth_info = ""
+        death_info = ""
+
+        # Check for birth event
+        birth_ref_index = full_person_data.get("birth_ref_index", -1)
+        if birth_ref_index >= 0 and birth_ref_index < len(events):
+            birth_event = events[birth_ref_index]
+            birth_date = format_date(birth_event.get("date", {}))
+            birth_place = await format_place(
+                client, tree_id, birth_event.get("place", ""), inline=True
+            )
+            birth_info = f"{birth_date} - {birth_place}" if birth_place else birth_date
+
+        # Check for death event
+        death_ref_index = full_person_data.get("death_ref_index", -1)
+        if death_ref_index >= 0 and death_ref_index < len(events):
+            death_event = events[death_ref_index]
+            death_date = format_date(death_event.get("date", {}))
+            death_place = await format_place(
+                client, tree_id, death_event.get("place", ""), inline=True
+            )
+            death_info = f"{death_date} - {death_place}" if death_place else death_date
+
+        # If still living, show as such
+        if full_person_data.get("living", False):
+            death_info = "Living"
+
+        return birth_info, death_info
+
+    except Exception:
+        return "", ""
