@@ -204,6 +204,68 @@ async def format_family_detail(client, tree_id: str, handle: str) -> str:
                 except Exception:
                     pass
 
+    # Re-read extended after timeline loop
+    extended = family_data.get("extended", {})
+
+    # Relationship type
+    relationship_type = family_data.get("type", "")
+    if relationship_type:
+        result += f"\nRelationship type: {relationship_type}\n"
+
+    # Tags
+    tag_list = family_data.get("tag_list", [])
+    if tag_list:
+        ext_tags = extended.get("tags", [])
+        tag_map = {t.get("handle"): t.get("name", "") for t in ext_tags}
+        tag_strs = []
+        for h in tag_list:
+            tag_name = tag_map.get(h, "")
+            tag_strs.append(f"{tag_name} [{h}]" if tag_name else f"[{h}]")
+        if tag_strs:
+            result += f"Tags: {', '.join(tag_strs)}\n"
+
+    # Attributes
+    attribute_list = family_data.get("attribute_list", [])
+    if attribute_list:
+        attr_strs = []
+        for attr in attribute_list:
+            attr_type = attr.get("type", "")
+            if isinstance(attr_type, dict):
+                attr_type = attr_type.get("string", "") or attr_type.get("_class", "")
+            attr_value = attr.get("value", "")
+            if attr_type and attr_value:
+                attr_strs.append(f"{attr_type}: {attr_value}")
+        if attr_strs:
+            result += f"Attributes: {'; '.join(attr_strs)}\n"
+
+    # LDS Ordinations
+    lds_ord_list = family_data.get("lds_ord_list", [])
+    if lds_ord_list:
+        result += "LDS Ordinations:\n"
+        for lds in lds_ord_list:
+            lds_type = lds.get("type", "")
+            lds_date = format_date(lds.get("date", {}))
+            temple = lds.get("temple", "")
+            status = lds.get("status", "")
+            line = f"  {lds_type}"
+            if lds_date:
+                line += f" - {lds_date}"
+            if temple:
+                line += f" @ {temple}"
+            if status:
+                line += f" [{status}]"
+            result += line + "\n"
+
+    # URLs
+    urls = family_data.get("urls", [])
+    if urls:
+        for url in urls:
+            if isinstance(url, dict):
+                url_path = url.get("path", "")
+                url_desc = url.get("description", "")
+                if url_path:
+                    result += f"{url_path}{' - ' + url_desc if url_desc else ''}\n"
+
     # Attached media section
     result += "\nAttached media:\n"
     media_list = family_data.get("media_list", [])
