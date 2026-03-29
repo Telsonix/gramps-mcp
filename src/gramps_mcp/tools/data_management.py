@@ -773,61 +773,81 @@ async def get_media_file_tool(arguments) -> List[TextContent]:
             if include_content:
                 result += f"\n### File Content (Embedded)\n\n"
                 max_size = params.max_file_size
-                
-                try:
-                    # Fetch the file content using the authenticated client
-                    file_content = await client.make_api_call(
-                        api_call=ApiCalls.GET_MEDIA_FILE,
-                        params=None,
-                        tree_id=tree_id,
-                        handle=handle,
-                    )
 
-                    if file_content:
-                        # Convert to base64
-                        if isinstance(file_content, bytes):
-                            file_bytes = file_content
-                        else:
-                            file_bytes = file_content.read() if hasattr(file_content, 'read') else str(file_content).encode()
-                        
-                        actual_size = len(file_bytes)
-                        
-                        # Check file size limit
-                        if max_size > 0 and actual_size > max_size:
-                            size_mb = actual_size / (1024 * 1024)
-                            limit_mb = max_size / (1024 * 1024)
-                            result += f"⚠️ **File Too Large for Inline Download**\n\n"
-                            result += f"- **File size:** {size_mb:.2f} MB\n"
-                            result += f"- **Size limit:** {limit_mb:.2f} MB\n\n"
-                            result += f"**Options to download:**\n"
-                            result += f"1. Use curl with credentials: curl -H 'Authorization: Bearer <JWT>' {file_url} -o filename\n"
-                            result += f"2. Increase limit: Call with max_file_size={int(actual_size * 1.1)}\n"
-                            result += f"3. Use Gramps Web UI: http://192.168.1.2:5002\n"
-                        else:
-                            # File size OK, encode and prepare for display
-                            base64_content = base64.b64encode(file_bytes).decode('utf-8')
-                            
-                            # Check if it's an image for data URI
-                            is_image = mime.lower().startswith('image/') and mime.lower() in [
-                                'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'
-                            ]
-                            
-                            if is_image:
-                                data_uri = f"data:{mime};base64,{base64_content}"
-                                result += f"**Displayable Image:**\n\n"
-                                result += f"![{gramps_id}]({data_uri})\n\n"
-                                result += f"**Base64 Content (first 200 chars):**\n\n"
-                                result += f"```\n"
-                                result += f"{base64_content[:200]}...\n"
-                                result += f"```\n\n"
+                try:
+                    # Pre-check file size via HEAD request to avoid downloading
+                    # files that exceed the size limit.
+                    skip_download = False
+                    if max_size > 0:
+                        try:
+                            _, head_headers = await client._make_request(
+                                "HEAD", file_url, return_headers=True
+                            )
+                            cl = head_headers.get("content-length") or head_headers.get("Content-Length")
+                            if cl:
+                                content_length = int(cl)
+                                if content_length > max_size:
+                                    size_mb = content_length / (1024 * 1024)
+                                    limit_mb = max_size / (1024 * 1024)
+                                    result += f"⚠️ **File Too Large for Inline Download**\n\n"
+                                    result += f"- **File size:** {size_mb:.2f} MB\n"
+                                    result += f"- **Size limit:** {limit_mb:.2f} MB\n\n"
+                                    result += f"**Options to download:**\n"
+                                    result += f"1. Use curl with credentials: curl -H 'Authorization: Bearer <JWT>' {file_url} -o filename\n"
+                                    result += f"2. Increase limit: Call with max_file_size={int(content_length * 1.1)}\n"
+                                    skip_download = True
+                        except Exception:
+                            # HEAD not supported or no Content-Length — fall through to download
+                            pass
+
+                    if not skip_download:
+                        # Fetch the file content using the authenticated client
+                        file_content = await client.make_api_call(
+                            api_call=ApiCalls.GET_MEDIA_FILE,
+                            params=None,
+                            tree_id=tree_id,
+                            handle=handle,
+                        )
+
+                        if file_content:
+                            # Convert to base64
+                            if isinstance(file_content, bytes):
+                                file_bytes = file_content
                             else:
-                                result += f"**Base64 Content (first 500 chars):**\n\n"
-                                result += f"```\n"
-                                result += f"{base64_content[:500]}...\n"
-                                result += f"```\n\n"
-                                result += f"**Full Base64:** {base64_content}\n\n"
-                            
-                            result += f"**Content Size:** {actual_size:,} bytes\n\n"
+                                file_bytes = file_content.read() if hasattr(file_content, 'read') else str(file_content).encode()
+
+                            actual_size = len(file_bytes)
+
+                            # Secondary size check in case Content-Length was absent
+                            if max_size > 0 and actual_size > max_size:
+                                size_mb = actual_size / (1024 * 1024)
+                                limit_mb = max_size / (1024 * 1024)
+                                result += f"⚠️ **File Too Large for Inline Download**\n\n"
+                                result += f"- **File size:** {size_mb:.2f} MB\n"
+                                result += f"- **Size limit:** {limit_mb:.2f} MB\n\n"
+                                result += f"**Options to download:**\n"
+                                result += f"1. Use curl with credentials: curl -H 'Authorization: Bearer <JWT>' {file_url} -o filename\n"
+                                result += f"2. Increase limit: Call with max_file_size={int(actual_size * 1.1)}\n"
+                            else:
+                                # File size OK, encode and prepare for display
+                                base64_content = base64.b64encode(file_bytes).decode('utf-8')
+
+                                # Check if it's an image for data URI
+                                is_image = mime.lower().startswith('image/') and mime.lower() in [
+                                    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'
+                                ]
+
+                                if is_image:
+                                    data_uri = f"data:{mime};base64,{base64_content}"
+                                    result += f"**Displayable Image:**\n\n"
+                                    result += f"![{gramps_id}]({data_uri})\n\n"
+                                else:
+                                    result += f"**Base64 Content:**\n\n"
+                                    result += f"```\n"
+                                    result += f"{base64_content}\n"
+                                    result += f"```\n\n"
+
+                                result += f"**Content Size:** {actual_size:,} bytes\n\n"
                 except Exception as e:
                     result += f"⚠️ Failed to fetch file content: {str(e)}\n\n"
                     logger.debug(f"Failed to fetch media file content: {e}")
