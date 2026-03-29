@@ -309,6 +309,142 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
                 except Exception:
                     pass
 
+    # Re-read extended after timeline loop (may have been shadowed by inner scopes)
+    extended = person_data.get("extended", {})
+
+    # Tags
+    tag_list = person_data.get("tag_list", [])
+    if tag_list:
+        extended_tags = extended.get("tags", [])
+        tag_map = {t.get("handle"): t for t in extended_tags}
+        tag_strs = []
+        for h in tag_list:
+            if h in tag_map:
+                tag_name = tag_map[h].get("name", "")
+                tag_strs.append(f"{tag_name} [{h}]" if tag_name else f"[{h}]")
+        if tag_strs:
+            result += f"\nTags: {', '.join(tag_strs)}\n"
+
+    # Attributes
+    attribute_list = person_data.get("attribute_list", [])
+    if attribute_list:
+        attr_strs = []
+        for attr in attribute_list:
+            attr_type = attr.get("type", "")
+            if isinstance(attr_type, dict):
+                attr_type = attr_type.get("string", "") or attr_type.get("_class", "")
+            attr_value = attr.get("value", "")
+            if attr_type and attr_value:
+                attr_strs.append(f"{attr_type}: {attr_value}")
+        if attr_strs:
+            result += f"Attributes: {'; '.join(attr_strs)}\n"
+
+    # Associations (godparent, friend, etc.)
+    person_ref_list = person_data.get("person_ref_list", [])
+    if person_ref_list:
+        extended_people = extended.get("people", [])
+        person_map = {}
+        for p in extended_people:
+            p_handle = p.get("handle", "")
+            pn = p.get("primary_name", {})
+            given = pn.get("first_name", "")
+            surnames = pn.get("surname_list", [])
+            surname = surnames[0].get("surname", "") if surnames else ""
+            person_map[p_handle] = {
+                "name": f"{given} {surname}".strip(),
+                "gramps_id": p.get("gramps_id", ""),
+            }
+        assoc_strs = []
+        for ref in person_ref_list:
+            ref_handle = ref.get("ref", "")
+            rel = ref.get("rel", "")
+            info = person_map.get(ref_handle, {})
+            ref_name = info.get("name", "")
+            ref_id = info.get("gramps_id", "")
+            if ref_name and rel:
+                assoc_strs.append(f"{ref_name} ({rel}) - {ref_id} [{ref_handle}]")
+            elif ref_name:
+                assoc_strs.append(f"{ref_name} - {ref_id} [{ref_handle}]")
+            else:
+                assoc_strs.append(f"{ref_id} [{ref_handle}]" if ref_id else f"[{ref_handle}]")
+        if assoc_strs:
+            result += f"Associations: {', '.join(assoc_strs)}\n"
+
+    # Addresses
+    address_list = person_data.get("address_list", [])
+    if address_list:
+        result += "Addresses:\n"
+        for addr in address_list:
+            addr_date = format_date(addr.get("date", {}))
+            parts = [
+                addr.get("street", ""),
+                addr.get("locality", ""),
+                addr.get("city", ""),
+                addr.get("county", ""),
+                addr.get("state", ""),
+                addr.get("postal", ""),
+                addr.get("country", ""),
+            ]
+            addr_str = ", ".join(p for p in parts if p)
+            phone = addr.get("phone", "")
+            line = f"  {addr_str}"
+            if phone:
+                line += f" | {phone}"
+            if addr_date:
+                line += f" ({addr_date})"
+            result += line + "\n"
+
+    # Direct citations on the person record
+    citation_list = person_data.get("citation_list", [])
+    if citation_list:
+        extended_citations = extended.get("citations", [])
+        cit_map = {c.get("handle"): c for c in extended_citations}
+        cit_strs = []
+        for h in citation_list:
+            if h in cit_map:
+                cit_id = cit_map[h].get("gramps_id", h)
+                cit_strs.append(f"{cit_id} [{h}]")
+        if cit_strs:
+            result += f"Citations: {', '.join(cit_strs)}\n"
+
+    # LDS Ordinations
+    lds_ord_list = person_data.get("lds_ord_list", [])
+    if lds_ord_list:
+        lds_type_map = {
+            0: "Baptism", 1: "Endowment", 2: "Seal to Parents",
+            3: "Seal to Spouse", 4: "Confirmation",
+        }
+        lds_status_map = {
+            0: "None", 1: "BIC", 2: "Cancelled", 3: "Child",
+            4: "Cleared", 5: "Completed", 6: "DNS", 7: "Infant",
+            8: "Pre-1970", 9: "Qualified", 10: "DNS/CAN",
+            11: "Stillborn", 12: "Submitted", 13: "Uncleared",
+        }
+        result += "LDS Ordinations:\n"
+        for lds in lds_ord_list:
+            lds_type = lds_type_map.get(lds.get("type"), str(lds.get("type", "")))
+            lds_date = format_date(lds.get("date", {}))
+            temple = lds.get("temple", "")
+            status = lds_status_map.get(lds.get("status"), "")
+            line = f"  {lds_type}"
+            if lds_date:
+                line += f" - {lds_date}"
+            if temple:
+                line += f" @ {temple}"
+            if status:
+                line += f" [{status}]"
+            result += line + "\n"
+
+    # URLs
+    urls = person_data.get("urls", [])
+    if urls:
+        for url in urls:
+            if isinstance(url, dict):
+                url_path = url.get("path", "")
+                url_desc = url.get("description", "")
+                if url_path:
+                    result += f"{url_path}{' - ' + url_desc if url_desc else ''}\n"
+
     # Attached media section
     result += "\nAttached media:\n"
     media_list = person_data.get("media_list", [])
