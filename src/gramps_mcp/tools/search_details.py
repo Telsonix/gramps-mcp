@@ -66,6 +66,10 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
 async def get_type_tool(arguments) -> List[TextContent]:
     """Universal get tool for any entity type details."""
     entity_type = _get_arg(arguments, "type")
+    # Convert enum to string value if needed
+    if hasattr(entity_type, "value"):
+        entity_type = entity_type.value
+    
     handle = _get_arg(arguments, "handle")
     gramps_id = _get_arg(arguments, "gramps_id")
 
