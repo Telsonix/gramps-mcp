@@ -63,7 +63,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
     return [TextContent(type="text", text=f"Error: {error_msg}")]
 
 
-async def get_type_tool(arguments) -> List[TextContent]:
+async def get_entity_tool(arguments) -> List[TextContent]:
     """Universal get tool for any entity type details."""
     entity_type = _get_arg(arguments, "type")
     # Convert enum to string value if needed

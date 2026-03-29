@@ -83,8 +83,10 @@ from .tools import (
     delete_tag_tool,
     find_anything_tool,
     find_tags_tool,
+    find_type_tool,
     get_ancestors_tool,
     get_descendants_tool,
+    get_event_span_tool,
     get_facts_tool,
     get_families_timeline_tool,
     get_living_tool,
@@ -94,13 +96,11 @@ from .tools import (
     get_relations_all_tool,
     get_relations_tool,
     get_tree_info_tool,
-    get_event_span_tool,
+    get_entity_tool,
     get_types_tool,
     update_media_file_tool,
     upload_media_file_tool,
 )
-from .tools.search_basic import find_type_tool
-from .tools.search_details import get_type_tool
 
 
 # Simple analysis models for tools that use direct dict access
@@ -192,7 +192,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": SimpleSearchParams,
         "handler": find_anything_tool,
     },
-    "get_type": {
+    "get_entity": {
         "description": (
             "Get comprehensive details for any genealogy record by identifier. "
             "REQUIRED: type (person/family/event/place/source/citation/media/note/repository), "
@@ -209,7 +209,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Use this after find_type/find_anything to get full record data."
         ),
         "schema": SimpleGetParams,
-        "handler": get_type_tool,
+        "handler": get_entity_tool,
     },
     # ========================================================================
     # Data Management Tools — Create/Update (10 tools)

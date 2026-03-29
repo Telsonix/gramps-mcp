@@ -18,8 +18,8 @@
 Unified interface for all MCP tools.
 
 This module exports all 39 genealogy tools organized by category:
-- Search & Discovery Tools (3)
-- Data Management Tools (9 create + 10 delete + 4 tag/media + 2 upload = 25)
+- Search & Discovery Tools (3): find_type, find_anything, get_type
+- Data Management Tools (25): 9 create + 10 delete + 4 tag/media + 2 upload
 - Analysis Tools (11)
 """
 
@@ -68,30 +68,16 @@ from .data_management import (
 )
 from .search_basic import (
     find_anything_tool,
-    find_citation_tool,
-    find_event_tool,
-    find_family_tool,
-    find_media_tool,
-    find_person_tool,
-    find_place_tool,
-    find_repository_tool,
-    find_source_tool,
+    find_type_tool,
 )
-from .search_details import get_type_tool
+from .search_details import get_entity_tool
 
 # Export all tools for easy import
 __all__ = [
-    # Search & Discovery Tools
-    "find_person_tool",
-    "find_family_tool",
-    "find_event_tool",
-    "find_place_tool",
-    "find_source_tool",
-    "find_repository_tool",
-    "find_citation_tool",
-    "find_media_tool",
+    # Search & Discovery Tools (3)
+    "find_type_tool",
     "find_anything_tool",
-    "get_type_tool",
+    "get_entity_tool",
     # Data Management Tools - Create
     "create_person_tool",
     "create_family_tool",
