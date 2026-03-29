@@ -89,10 +89,10 @@ class TestMCPServerSetup:
                     "create_repository",
                     
                     # Tree Management Tools (1)
-                    "tree_stats",
+                    "get_tree_info",
                     
                     # Analysis Tools (3)
-                    "get_descendants", "get_ancestors", "recent_changes"
+                    "get_descendants", "get_ancestors", "get_recent_changes"
                 }
                 
                 registered_tool_names = {tool.name for tool in tools}

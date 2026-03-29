@@ -424,7 +424,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # ========================================================================
     # Analysis & Lookup Tools (12 tools)
     # ========================================================================
-    "tree_stats": {
+    "get_tree_info": {
         "description": (
             "Get statistics about the entire family tree: total counts of people, families, "
             "events, places, sources, citations, media, notes, repositories. "
@@ -460,7 +460,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": AncestorsParams,
         "handler": get_ancestors_tool,
     },
-    "recent_changes": {
+    "get_recent_changes": {
         "description": (
             "Get a log of recent changes/modifications to the family tree. "
             "Shows what records were created, updated, or modified and when. "
