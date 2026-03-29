@@ -102,6 +102,11 @@ async def format_family(client, tree_id: str, handle: str) -> str:
         else:
             result += f"{gramps_id} - [{handle}]\n"
 
+        # Relationship type
+        relationship_type = family_data.get("type", "")
+        if relationship_type:
+            result += f"Type: {relationship_type}\n"
+
         # Marriage and divorce events
         extended = family_data.get("extended", {})
         events = extended.get("events", [])
@@ -160,6 +165,53 @@ async def format_family(client, tree_id: str, handle: str) -> str:
             if child_names:
                 result += f"Children: {', '.join(child_names)}\n"
 
+        # Citations (using extended map)
+        citation_list = family_data.get("citation_list", [])
+        if citation_list:
+            ext_citations = extended.get("citations", [])
+            cit_map = {}
+            for c in ext_citations:
+                h = c.get("handle", "")
+                if h:
+                    cit_map[h] = c.get("gramps_id", "")
+            cit_strs = []
+            for h in citation_list:
+                cit_id = cit_map.get(h, "")
+                if cit_id:
+                    cit_strs.append(f"{cit_id} [{h}]")
+                elif h:
+                    cit_strs.append(f"[{h}]")
+            if cit_strs:
+                result += f"Citations: {', '.join(cit_strs)}\n"
+
+        # Tags
+        tag_list = family_data.get("tag_list", [])
+        if tag_list:
+            ext_tags = extended.get("tags", [])
+            tag_map = {}
+            for t in ext_tags:
+                h = t.get("handle", "")
+                if h:
+                    tag_map[h] = t.get("name", "")
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"Tags: {', '.join(tag_strs)}\n"
+
+        # Attributes
+        attribute_list = family_data.get("attribute_list", [])
+        if attribute_list:
+            attr_strs = [
+                f"{a.get('type', '')}: {a.get('value', '')}"
+                for a in attribute_list
+                if a.get("type") or a.get("value")
+            ]
+            if attr_strs:
+                result += f"Attributes: {'; '.join(attr_strs)}\n"
+
         # Events (all events with roles)
         event_list = []
         for i, event_ref in enumerate(event_ref_list):
@@ -167,13 +219,17 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                 event = events[i]
                 event_type = event.get("type", "")
                 event_gramps_id = event.get("gramps_id", "")
+                event_handle_ev = event.get("handle", "")
 
                 # Get role from event_ref
                 role = event_ref.get("role", "") if isinstance(event_ref, dict) else ""
                 if role:
-                    event_list.append(f"{event_type}, {role} ({event_gramps_id})")
+                    entry = f"{event_type}, {role} ({event_gramps_id})"
                 else:
-                    event_list.append(f"{event_type} ({event_gramps_id})")
+                    entry = f"{event_type} ({event_gramps_id})"
+                if event_handle_ev:
+                    entry += f" [{event_handle_ev}]"
+                event_list.append(entry)
 
         if event_list:
             result += f"Events: {', '.join(event_list)}\n"
@@ -198,7 +254,9 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                         if media_data:
                             media_gramps_id = media_data.get("gramps_id", "")
                             if media_gramps_id:
-                                media_ids.append(media_gramps_id)
+                                media_ids.append(
+                                    f"{media_gramps_id} [{media_handle}]"
+                                )
                     except Exception:
                         continue
 
@@ -217,12 +275,42 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                     if note_data:
                         note_gramps_id = note_data.get("gramps_id", "")
                         if note_gramps_id:
-                            note_ids.append(note_gramps_id)
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
                 except Exception:
                     continue
 
             if note_ids:
                 result += f"Attached notes: {', '.join(note_ids)}\n"
+
+        # LDS Ordinations
+        lds_ord_list = family_data.get("lds_ord_list", [])
+        if lds_ord_list:
+            lds_type_map = {
+                "Baptism": "Baptism",
+                "Endowment": "Endowment",
+                "Sealed to Parents": "Sealed to Parents",
+                "Sealed to Spouse": "Sealed to Spouse",
+                "Confirmation": "Confirmation",
+            }
+            lds_strs = []
+            for lds in lds_ord_list:
+                lds_type = lds.get("type", "")
+                lds_label = lds_type_map.get(lds_type, lds_type)
+                lds_date = format_date(lds.get("date", {}))
+                lds_temple = lds.get("temple", "")
+                lds_status = lds.get("status", "")
+                parts = [lds_label]
+                if lds_date and lds_date != "date unknown":
+                    parts.append(lds_date)
+                if lds_temple:
+                    parts.append(f"Temple: {lds_temple}")
+                if lds_status:
+                    parts.append(f"Status: {lds_status}")
+                lds_strs.append(", ".join(parts))
+            if lds_strs:
+                result += "LDS Ordinations:\n"
+                for s in lds_strs:
+                    result += f"  {s}\n"
 
         # URLs
         urls = family_data.get("urls", [])
