@@ -111,11 +111,11 @@ async def get_entity_tool(arguments) -> List[TextContent]:
     if not handle:
         return [TextContent(type="text", text=f"Could not find {entity_type} with the provided identifier.")]
 
-    return await get_entity_tool(entity_type, handle)
+    return await _get_entity_impl(entity_type, handle)
 
 
 @with_client
-async def get_entity_tool(client, entity_type: str, handle: str) -> List[TextContent]:
+async def _get_entity_impl(client, entity_type: str, handle: str) -> List[TextContent]:
     """Get details for any entity type: person, family, event, place, source, citation, media, note, or repository."""
     try:
         settings = get_settings()
