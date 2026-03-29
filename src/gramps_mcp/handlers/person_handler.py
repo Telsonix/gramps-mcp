@@ -134,13 +134,21 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         parent_families = extended.get("parent_families", [])
         for family in parent_families:
             family_gramps_id = family.get("gramps_id", "")
-            family_relationships.append(f"child ({family_gramps_id})")
+            family_handle = family.get("handle", "")
+            fam_str = f"child ({family_gramps_id})"
+            if family_handle:
+                fam_str += f" [{family_handle}]"
+            family_relationships.append(fam_str)
 
         # As parent
         families = extended.get("families", [])
         for family in families:
             family_gramps_id = family.get("gramps_id", "")
-            family_relationships.append(f"parent ({family_gramps_id})")
+            family_handle = family.get("handle", "")
+            fam_str = f"parent ({family_gramps_id})"
+            if family_handle:
+                fam_str += f" [{family_handle}]"
+            family_relationships.append(fam_str)
 
         if family_relationships:
             result += f"Family member of: {', '.join(family_relationships)}\n"
@@ -152,13 +160,17 @@ async def format_person(client, tree_id: str, handle: str) -> str:
                 event = events[i]
                 event_type = event.get("type", "")
                 event_gramps_id = event.get("gramps_id", "")
+                event_handle = event.get("handle", "")
 
                 # Get role from event_ref
                 role = event_ref.get("role", "") if isinstance(event_ref, dict) else ""
                 if role:
-                    event_list.append(f"{event_type}, {role} ({event_gramps_id})")
+                    event_str = f"{event_type}, {role} ({event_gramps_id})"
                 else:
-                    event_list.append(f"{event_type} ({event_gramps_id})")
+                    event_str = f"{event_type} ({event_gramps_id})"
+                if event_handle:
+                    event_str += f" [{event_handle}]"
+                event_list.append(event_str)
 
         if event_list:
             result += f"Events: {', '.join(event_list)}\n"
@@ -167,10 +179,17 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         tag_list = person_data.get("tag_list", [])
         if tag_list:
             extended_tags = extended.get("tags", [])
-            tag_name_map = {t.get("handle"): t.get("name", "") for t in extended_tags}
-            tag_names = [tag_name_map.get(h, h) for h in tag_list if h]
-            if tag_names:
-                result += f"Tags: {', '.join(tag_names)}\n"
+            tag_map = {t.get("handle"): t for t in extended_tags}
+            tag_strs = []
+            for h in tag_list:
+                if h in tag_map:
+                    tag = tag_map[h]
+                    tag_name = tag.get("name", "")
+                    tag_str = tag_name if tag_name else h
+                    tag_str += f" [{h}]"
+                    tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"Tags: {', '.join(tag_strs)}\n"
 
         # Attributes (attribute_list)
         attribute_list = person_data.get("attribute_list", [])
@@ -197,16 +216,25 @@ async def format_person(client, tree_id: str, handle: str) -> str:
                 given = pn.get("first_name", "")
                 surnames = pn.get("surname_list", [])
                 surname = surnames[0].get("surname", "") if surnames else ""
-                person_map[p_handle] = f"{given} {surname}".strip()
+                person_map[p_handle] = {
+                    "name": f"{given} {surname}".strip(),
+                    "handle": p_handle,
+                    "gramps_id": p.get("gramps_id", ""),
+                }
             assoc_strs = []
             for ref in person_ref_list:
                 ref_handle = ref.get("ref", "")
                 rel = ref.get("rel", "")
-                ref_name = person_map.get(ref_handle, ref_handle)
-                if ref_name and rel:
-                    assoc_strs.append(f"{ref_name} ({rel})")
-                elif ref_name:
-                    assoc_strs.append(ref_name)
+                if ref_handle in person_map:
+                    ref_name = person_map[ref_handle]["name"]
+                    ref_id = person_map[ref_handle]["gramps_id"]
+                    if ref_name and rel:
+                        assoc_str = f"{ref_name} ({rel}) - {ref_id} [{ref_handle}]"
+                    elif ref_name:
+                        assoc_str = f"{ref_name} - {ref_id} [{ref_handle}]"
+                    else:
+                        assoc_str = f"{ref_id} [{ref_handle}]" if ref_id else f"[{ref_handle}]"
+                    assoc_strs.append(assoc_str)
             if assoc_strs:
                 result += f"Associations: {', '.join(assoc_strs)}\n"
 
@@ -238,10 +266,15 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         citation_list = person_data.get("citation_list", [])
         if citation_list:
             extended_citations = extended.get("citations", [])
-            citation_id_map = {c.get("handle"): c.get("gramps_id", "") for c in extended_citations}
-            citation_ids = [citation_id_map.get(h, h) for h in citation_list if h]
-            if citation_ids:
-                result += f"Citations: {', '.join(citation_ids)}\n"
+            cit_map = {c.get("handle"): c for c in extended_citations}
+            cit_strs = []
+            for h in citation_list:
+                if h in cit_map:
+                    cit = cit_map[h]
+                    cit_id = cit.get("gramps_id", h)
+                    cit_strs.append(f"{cit_id} [{h}]")
+            if cit_strs:
+                result += f"Citations: {', '.join(cit_strs)}\n"
 
         # LDS ordinations (lds_ord_list)
         lds_ord_list = person_data.get("lds_ord_list", [])

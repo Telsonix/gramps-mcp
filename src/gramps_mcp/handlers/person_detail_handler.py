@@ -113,22 +113,34 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
             if father:
                 father_name = _extract_person_name(father)
                 father_id = father.get("gramps_id", "")
+                father_handle = father.get("handle", "")
                 father_birth, father_death = await _get_birth_death_dates(
                     client, tree_id, father
                 )
                 dates = ", ".join(filter(None, [father_birth, father_death]))
-                result += f"- {father_name} - {father_id} - {dates}\n"
+                line = f"- {father_name} - {father_id}"
+                if father_handle:
+                    line += f" [{father_handle}]"
+                if dates:
+                    line += f" - {dates}"
+                result += line + "\n"
 
             # Mother
             mother = extended.get("mother", {})
             if mother:
                 mother_name = _extract_person_name(mother)
                 mother_id = mother.get("gramps_id", "")
+                mother_handle = mother.get("handle", "")
                 mother_birth, mother_death = await _get_birth_death_dates(
                     client, tree_id, mother
                 )
                 dates = ", ".join(filter(None, [mother_birth, mother_death]))
-                result += f"- {mother_name} - {mother_id} - {dates}\n"
+                line = f"- {mother_name} - {mother_id}"
+                if mother_handle:
+                    line += f" [{mother_handle}]"
+                if dates:
+                    line += f" - {dates}"
+                result += line + "\n"
 
             # Siblings (other children in same family)
             children = extended.get("children", [])
@@ -140,11 +152,17 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
                 for sibling in siblings:
                     sibling_name = _extract_person_name(sibling)
                     sibling_id = sibling.get("gramps_id", "")
+                    sibling_handle = sibling.get("handle", "")
                     sibling_birth, sibling_death = await _get_birth_death_dates(
                         client, tree_id, sibling
                     )
                     dates = ", ".join(filter(None, [sibling_birth, sibling_death]))
-                    result += f"- {sibling_name} - {sibling_id} - {dates}\n"
+                    line = f"- {sibling_name} - {sibling_id}"
+                    if sibling_handle:
+                        line += f" [{sibling_handle}]"
+                    if dates:
+                        line += f" - {dates}"
+                    result += line + "\n"
 
         except Exception:
             continue
@@ -174,11 +192,17 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
             if spouse:
                 spouse_name = _extract_person_name(spouse)
                 spouse_id = spouse.get("gramps_id", "")
+                spouse_handle = spouse.get("handle", "")
                 spouse_birth, spouse_death = await _get_birth_death_dates(
                     client, tree_id, spouse
                 )
                 dates = ", ".join(filter(None, [spouse_birth, spouse_death]))
-                result += f"Spouse:\n- {spouse_name} - {spouse_id} - {dates}\n"
+                line = f"- {spouse_name} - {spouse_id}"
+                if spouse_handle:
+                    line += f" [{spouse_handle}]"
+                if dates:
+                    line += f" - {dates}"
+                result += f"Spouse:\n{line}\n"
 
                 # Children of this spouse
                 children = extended.get("children", [])
@@ -187,11 +211,17 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
                     for child in children:
                         child_name = _extract_person_name(child)
                         child_id = child.get("gramps_id", "")
+                        child_handle = child.get("handle", "")
                         child_birth, child_death = await _get_birth_death_dates(
                             client, tree_id, child
                         )
                         dates = ", ".join(filter(None, [child_birth, child_death]))
-                        result += f"- {child_name} - {child_id} - {dates}\n"
+                        line = f"- {child_name} - {child_id}"
+                        if child_handle:
+                            line += f" [{child_handle}]"
+                        if dates:
+                            line += f" - {dates}"
+                        result += line + "\n"
         except Exception:
             continue
 

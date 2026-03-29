@@ -74,7 +74,7 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                     father_gender = _get_gender_letter(father_data.get("gender", 2))
                     father_id = father_data.get("gramps_id", "")
                     family_members.append(
-                        f"Father: {father_name} ({father_gender}) - {father_id}"
+                        f"Father: {father_name} ({father_gender}) - {father_id} [{father_handle}]"
                     )
             except Exception as e:
                 logger.debug(f"Failed to fetch father {father_handle}: {e}")
@@ -91,7 +91,7 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                     mother_gender = _get_gender_letter(mother_data.get("gender", 2))
                     mother_id = mother_data.get("gramps_id", "")
                     family_members.append(
-                        f"Mother: {mother_name} ({mother_gender}) - {mother_id}"
+                        f"Mother: {mother_name} ({mother_gender}) - {mother_id} [{mother_handle}]"
                     )
             except Exception as e:
                 logger.debug(f"Failed to fetch mother {mother_handle}: {e}")
@@ -152,7 +152,7 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                             )
                             child_id = child_data.get("gramps_id", "")
                             child_names.append(
-                                f"{child_name} ({child_gender}) - {child_id}"
+                                f"{child_name} ({child_gender}) - {child_id} [{child_handle}]"
                             )
                     except Exception as e:
                         logger.debug(f"Failed to fetch child {child_handle}: {e}")
