@@ -19,6 +19,9 @@ Gramps MCP provides AI assistants with direct access to your Gramps genealogy da
 - **Data Management**: Create and update genealogy records with proper validation
 - **Tree Analysis**: Trace descendants, ancestors, and family connections
 - **Relationship Discovery**: Explore family connections and research gaps
+- **DNA Integration**: Import and match DNA data against your tree
+- **Report Generation**: Generate and retrieve Gramps reports in Markdown
+- **Type System**: Query all valid type values and defaults for record creation
 - **Tree Information**: Get comprehensive tree statistics and track changes
 
 Add Gramps MCP to your AI assistant and transform how you research family history:
@@ -43,12 +46,12 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ## Features
 
-### 39 Genealogy Tools
+### 54 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
 - **find_anything** - Text search across all genealogy data (matches literal text, not logical combinations)
-- **get_type** - Get comprehensive information about specific persons or families by ID
+- **get_entity** - Get comprehensive information about any record type by handle or gramps_id
 
 #### Data Management (10 tools)
 - **create_person** - Create or update person records
@@ -74,25 +77,52 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **delete_media** - Delete a media item by handle
 - **delete_tag** - Delete a tag by handle
 
-#### Tag & Media Tools (4 tools)
+#### Tags & Media (4 tools)
 - **find_tags** - Find/list all tags in the database
-- **get_media_file** - Get information about a media file (metadata and download URL)
+- **get_media_file** - Get information about a media file (metadata and optional download)
 - **upload_media_file** - Upload a new media file from the local filesystem
 - **update_media_file** - Update an existing media object's file from the local filesystem
 
-#### Analysis Tools (12 tools)
-- **tree_stats** - Get tree statistics and information
+#### Analysis & Relationships (13 tools)
+- **get_tree_info** - Get statistics about the entire family tree (people, families, events, etc.)
 - **get_descendants** - Find all descendants of a person
 - **get_ancestors** - Find all ancestors of a person
 - **get_relations** - Find the relationship between two people (e.g., cousins, uncle/nephew)
 - **get_relations_all** - Find ALL possible relationship paths between two people
 - **get_living** - Check if a person is considered living (for privacy)
+- **get_living_dates** - Get living status and estimated dates for privacy calculations
 - **get_facts** - Get computed facts and statistics about the tree
 - **get_people_timeline** - Get a timeline of events for a group of people
 - **get_families_timeline** - Get a timeline of events for a group of families
 - **get_event_span** - Calculate time span between two events (e.g., "how old was X when Y happened")
 - **get_types** - Get all valid type values (event types, name types, place types, etc.)
-- **recent_changes** - Track recent modifications to your data
+- **get_recent_changes** - Track recent modifications to your data
+
+#### DNA Tools (2 tools)
+- **get_dna_matches** - Retrieve DNA matches for a person from registered DNA databases
+- **match_dna_parser** - Parse DNA match files and import match data
+
+#### Reports Tools (5 tools)
+- **list_reports** - List all available reports in the system
+- **get_report** - Get report metadata, configuration, and availability
+- **get_report_file** - Download a generated report file
+- **submit_report_file** - Generate a report asynchronously and get task tracking
+- **get_report_processed** - Retrieve processed report content with automatic HTML-to-markdown conversion
+
+#### Task Management (1 tool)
+- **get_task_status** - Check status and progress of async tasks (reports, imports, exports)
+
+#### Holidays Tools (2 tools)
+- **get_holidays** - Get holidays for a specific country and year
+- **get_holiday_on_date** - Check if a specific date is a holiday
+
+#### Tree Management (2 tools)
+- **get_trees** - List all family trees in the database
+- **get_tree** - Get details and metadata for a specific family tree
+
+#### Type System (2 tools)
+- **get_types_default_datatype** - Get type defaults for application datatypes (person, family, event, etc.)
+- **get_types_default_map** - Get type mappings and standardized values
 
 ## Installation
 
@@ -260,20 +290,21 @@ For any other MCP client, use the HTTP transport endpoint:
 
 ```
 src/gramps_mcp/
-|-- server.py           # MCP server with HTTP transport
-|-- tools.py            # Tool registry and exports
+|-- server.py           # MCP server, tool registry, and HTTP/stdio transport
 |-- client.py           # Gramps Web API client
-|-- models.py           # Pydantic data models
 |-- auth.py             # JWT authentication
 |-- config.py           # Configuration management
+|-- utils.py            # Shared utilities (HTML-to-markdown, etc.)
 |-- tools/              # Modular tool implementations
-|   |-- search_basic.py
-|   |-- search_details.py
-|   |-- data_management.py
-|   |-- tree_management.py
-|   `-- analysis.py
-|-- handlers/           # Data formatting handlers
-`-- client/             # API client modules
+|   |-- search_basic.py     # Search and entity lookup tools
+|   |-- search_details.py   # Detailed record retrieval handlers
+|   |-- data_management.py  # Create, update, delete tools
+|   `-- analysis.py         # Analysis, reports, DNA, timelines
+|-- models/             # Pydantic models and API definitions
+|   |-- api_calls.py        # API endpoint enum
+|   |-- api_mapping.py      # Endpoint-to-URL mappings
+|   `-- parameters/         # Per-tool parameter models
+`-- handlers/           # Data formatting handlers per record type
 ```
 
 ### Technology Stack

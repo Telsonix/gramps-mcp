@@ -24,6 +24,7 @@ tree statistics, ancestor/descendant discovery, and recent changes tracking.
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, List
 
 from mcp.types import TextContent
@@ -943,3 +944,689 @@ async def get_types_tool(client, arguments) -> List[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "types retrieval")
+
+
+# ============================================================================
+# DNA Matching Tools (2 tools)
+# ============================================================================
+
+
+@with_client
+async def get_dna_matches_tool(client, arguments) -> List[TextContent]:
+    """
+    Get DNA matches for a person from the database.
+
+    Retrieves list of DNA matches associated with a person record.
+    """
+    try:
+        gramps_id = _get_arg(arguments, "gramps_id")
+        if not gramps_id:
+            raise ValueError("gramps_id is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get person handle from gramps_id
+        from .search_basic import _gramps_id_to_handle
+        handle = await _gramps_id_to_handle(client, gramps_id, tree_id)
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_PERSON_DNA_MATCHES,
+            params=None,
+            tree_id=tree_id,
+            gramps_id_or_handle=handle,
+        )
+
+        if not result or not result.get("matches"):
+            return [TextContent(type="text", text=f"No DNA matches found for {gramps_id}.")]
+
+        response = f"# DNA Matches for {gramps_id}\n\n"
+        matches = result.get("matches", [])
+
+        for match in matches:
+            match_name = match.get("name", "Unknown")
+            match_id = match.get("dna_id", "N/A")
+            relationship = match.get("relationship", "Unknown")
+            confidence = match.get("confidence", "N/A")
+
+            response += f"- **{match_name}** (ID: {match_id})\n"
+            response += f"  Relationship: {relationship}\n"
+            response += f"  Confidence: {confidence}\n\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "DNA matches retrieval")
+
+
+@with_client
+async def match_dna_parser_tool(client, arguments) -> List[TextContent]:
+    """
+    Submit a DNA match file for parsing and matching.
+
+    Parses DNA data files and attempts to match individuals in the database.
+    """
+    try:
+        file_path = _get_arg(arguments, "file_path")
+        file_format = _get_arg(arguments, "file_format", "gedcom")
+
+        if not file_path:
+            raise ValueError("file_path is required")
+
+        if not os.path.exists(file_path):
+            raise ValueError(f"File not found: {file_path}")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.POST_PARSERS_DNA_MATCH,
+            params={"format": file_format},
+            tree_id=tree_id,
+            file_content=file_content,
+        )
+
+        if isinstance(result, dict) and "matches_found" in result:
+            matches_count = result.get("matches_found", 0)
+            return [
+                TextContent(
+                    type="text",
+                    text=f"DNA parsing complete. Found {matches_count} potential matches.",
+                )
+            ]
+
+        return [TextContent(type="text", text=str(result))]
+
+    except Exception as e:
+        return _format_error_response(e, "DNA parsing")
+
+
+# ============================================================================
+# Reports System Tools (5 tools)
+# ============================================================================
+
+
+@with_client
+async def list_reports_tool(client, arguments) -> List[TextContent]:
+    """
+    List all available reports in the database.
+
+    Returns a list of report definitions and their current status.
+    """
+    try:
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_REPORTS,
+            params=None,
+            tree_id=tree_id,
+        )
+
+        if not result:
+            return [TextContent(type="text", text="No reports available.")]
+
+        reports_list = result if isinstance(result, list) else result.get("reports", [])
+
+        response = "# Available Reports\n\n"
+        for report in reports_list:
+            report_id = report.get("id", report.get("report_id", "Unknown"))
+            report_name = report.get("name", "Unknown")
+            description = report.get("description", "No description")
+
+            response += f"- **{report_name}** (ID: {report_id})\n"
+            response += f"  {description}\n\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "reports listing")
+
+
+@with_client
+async def get_report_tool(client, arguments) -> List[TextContent]:
+    """
+    Get details of a specific report.
+
+    Returns metadata and configuration for a report.
+    """
+    try:
+        report_id = _get_arg(arguments, "report_id")
+        if not report_id:
+            raise ValueError("report_id is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_REPORT,
+            params=None,
+            tree_id=tree_id,
+            report_id=report_id,
+        )
+
+        if not result:
+            return [TextContent(type="text", text=f"Report not found: {report_id}")]
+
+        report_name = result.get("name", report_id)
+        description = result.get("description", "No description")
+        status = result.get("status", "Unknown")
+
+        response = f"# Report: {report_name}\n\n"
+        response += f"**ID**: {report_id}\n"
+        response += f"**Status**: {status}\n"
+        response += f"**Description**: {description}\n\n"
+
+        if "options" in result:
+            response += "## Configuration Options\n"
+            for opt_name, opt_value in result.get("options", {}).items():
+                response += f"- {opt_name}: {opt_value}\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "report retrieval")
+
+
+@with_client
+async def get_report_file_tool(client, arguments) -> List[TextContent]:
+    """
+    Download a generated report file.
+
+    Returns the raw report file content for a specific report.
+    """
+    try:
+        report_id = _get_arg(arguments, "report_id")
+        if not report_id:
+            raise ValueError("report_id is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_REPORT_FILE,
+            params=None,
+            tree_id=tree_id,
+            report_id=report_id,
+        )
+
+        if isinstance(result, dict) and "file_name" in result:
+            filename = result.get("file_name")
+            size = result.get("file_size", "Unknown")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Report file ready: {filename} ({size} bytes)",
+                )
+            ]
+
+        return [TextContent(type="text", text=str(result))]
+
+    except Exception as e:
+        return _format_error_response(e, "report file download")
+
+
+@with_client
+async def submit_report_file_tool(client, arguments) -> List[TextContent]:
+    """
+    Submit a file for report generation.
+
+    Triggers async report generation for the specified report type.
+    """
+    try:
+        report_id = _get_arg(arguments, "report_id")
+        if not report_id:
+            raise ValueError("report_id is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        params = ReportFileParams(options=_get_arg(arguments, "options"))
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.POST_REPORT_FILE,
+            params=params,
+            tree_id=tree_id,
+            report_id=report_id,
+        )
+
+        # Handle async task response
+        if isinstance(result, dict):
+            if "task" in result and "id" in result["task"]:
+                task_id = result["task"]["id"]
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Report generation started (Task ID: {task_id}). "
+                        f"Use get_task_status to check progress.",
+                    )
+                ]
+            elif "file_name" in result:
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Report generated: {result.get('file_name')}",
+                    )
+                ]
+
+        return [TextContent(type="text", text=str(result))]
+
+    except Exception as e:
+        return _format_error_response(e, "report submission")
+
+
+@with_client
+async def get_report_processed_tool(client, arguments) -> List[TextContent]:
+    """
+    Get a processed report file with specific filename.
+
+    Returns report file that has been processed or converted to a specific format.
+    """
+    try:
+        report_id = _get_arg(arguments, "report_id")
+        filename = _get_arg(arguments, "filename")
+
+        if not report_id or not filename:
+            raise ValueError("report_id and filename are required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        params = ReportFileParams(options=None)
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_REPORT_PROCESSED,
+            params=params,
+            tree_id=tree_id,
+            report_id=report_id,
+            filename=filename,
+        )
+
+        if isinstance(result, dict) and "raw_content" in result:
+            content = result["raw_content"]
+            # Convert HTML to markdown if needed
+            if "<html" in str(content).lower():
+                content = html_to_markdown(content)
+            return [TextContent(type="text", text=content)]
+
+        return [TextContent(type="text", text=str(result))]
+
+    except Exception as e:
+        return _format_error_response(e, "processed report retrieval")
+
+
+# ============================================================================
+# Task & Holidays Tools (3 tools)
+# ============================================================================
+
+
+@with_client
+async def get_task_status_tool(client, arguments) -> List[TextContent]:
+    """
+    Get the status of an async task.
+
+    Returns current progress and status of a long-running task.
+    """
+    try:
+        task_id = _get_arg(arguments, "task_id")
+        if not task_id:
+            raise ValueError("task_id is required")
+
+        # Tasks are global, not tree-specific
+        result = await client._make_request("GET", f"{client.base_url}/tasks/{task_id}")
+
+        if not result:
+            return [TextContent(type="text", text=f"Task not found: {task_id}")]
+
+        state = result.get("state", "UNKNOWN")
+        progress = result.get("progress", 0)
+        info = result.get("info", "")
+
+        response = f"# Task Status: {task_id}\n\n"
+        response += f"**State**: {state}\n"
+        response += f"**Progress**: {progress}%\n"
+
+        if info:
+            response += f"**Info**: {info}\n"
+
+        if state == "SUCCESS":
+            result_obj = result.get("result_object")
+            if result_obj:
+                response += f"\n**Result**: {json.dumps(result_obj, indent=2)}\n"
+        elif state == "FAILURE":
+            error_msg = result.get("info", "Unknown error")
+            response += f"\n**Error**: {error_msg}\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "task status retrieval")
+
+
+@with_client
+async def get_holidays_tool(client, arguments) -> List[TextContent]:
+    """
+    Get list of holidays for a country and year.
+
+    Returns holidays for genealogy event marking.
+    """
+    try:
+        country = _get_arg(arguments, "country", "US")
+        year = _get_arg(arguments, "year")
+
+        if not year:
+            from datetime import datetime
+            year = datetime.now().year
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_HOLIDAYS,
+            params={"country": country, "year": year},
+            tree_id=tree_id,
+        )
+
+        if not result or not result.get("holidays"):
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No holidays found for {country} in {year}.",
+                )
+            ]
+
+        holidays = result.get("holidays", [])
+        response = f"# Holidays in {country} ({year})\n\n"
+
+        for holiday in holidays:
+            name = holiday.get("name", "Unknown")
+            date = holiday.get("date", "Unknown")
+            description = holiday.get("description", "")
+
+            response += f"- **{name}**: {date}\n"
+            if description:
+                response += f"  {description}\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "holidays retrieval")
+
+
+@with_client
+async def get_holiday_on_date_tool(client, arguments) -> List[TextContent]:
+    """
+    Get holiday on a specific date.
+
+    Returns holiday information for a specific day.
+    """
+    try:
+        country = _get_arg(arguments, "country", "US")
+        year = _get_arg(arguments, "year")
+        month = _get_arg(arguments, "month")
+        day = _get_arg(arguments, "day")
+
+        if not all([year, month, day]):
+            raise ValueError("year, month, and day are required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_HOLIDAYS_DATE,
+            params=None,
+            tree_id=tree_id,
+            country=country,
+            year=year,
+            month=month,
+            day=day,
+        )
+
+        if not result or not result.get("holiday"):
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No holiday on {year}-{month:02d}-{day:02d} "
+                    f"in {country}.",
+                )
+            ]
+
+        holiday = result.get("holiday", {})
+        name = holiday.get("name", "Unknown")
+        description = holiday.get("description", "")
+
+        response = f"# Holiday on {year}-{month:02d}-{day:02d}\n\n"
+        response += f"**Name**: {name}\n"
+        if description:
+            response += f"**Description**: {description}\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "holiday date lookup")
+
+
+# ============================================================================
+# Tree & Type System Tools (5 tools)
+# ============================================================================
+
+
+@with_client
+async def get_trees_tool(client, arguments) -> List[TextContent]:
+    """
+    List all family trees in the database.
+
+    Returns information about all available trees.
+    """
+    try:
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_TREES,
+            params=None,
+            tree_id=None,  # Trees are global
+        )
+
+        if not result:
+            return [TextContent(type="text", text="No trees available.")]
+
+        trees = result if isinstance(result, list) else result.get("trees", [])
+
+        response = "# Available Family Trees\n\n"
+        for tree in trees:
+            tree_id = tree.get("id", tree.get("tree_id", "Unknown"))
+            tree_name = tree.get("name", "Unknown")
+            owner = tree.get("owner", "Unknown")
+
+            response += f"- **{tree_name}** (ID: {tree_id})\n"
+            response += f"  Owner: {owner}\n\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "trees listing")
+
+
+@with_client
+async def get_tree_tool(client, arguments) -> List[TextContent]:
+    """
+    Get details of a specific family tree.
+
+    Returns metadata and statistics for a tree.
+    """
+    try:
+        tree_id = _get_arg(arguments, "tree_id")
+        if not tree_id:
+            raise ValueError("tree_id is required")
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_TREE,
+            params=None,
+            tree_id=None,  # Trees are global
+            tree_id_param=tree_id,
+        )
+
+        if not result:
+            return [TextContent(type="text", text=f"Tree not found: {tree_id}")]
+
+        tree_name = result.get("name", tree_id)
+        owner = result.get("owner", "Unknown")
+        persons_count = result.get("persons", 0)
+        families_count = result.get("families", 0)
+
+        response = f"# Tree: {tree_name}\n\n"
+        response += f"**ID**: {tree_id}\n"
+        response += f"**Owner**: {owner}\n"
+        response += f"**Persons**: {persons_count}\n"
+        response += f"**Families**: {families_count}\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "tree retrieval")
+
+
+@with_client
+async def get_types_default_datatype_tool(client, arguments) -> List[TextContent]:
+    """
+    Get type defaults for a specific data type.
+
+    Returns default values for a particular Gramps data type.
+    """
+    try:
+        datatype = _get_arg(arguments, "datatype")
+        if not datatype:
+            raise ValueError("datatype is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_TYPES_DEFAULT_DATATYPE,
+            params=None,
+            tree_id=tree_id,
+            datatype=datatype,
+        )
+
+        if not result:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No type defaults found for datatype: {datatype}",
+                )
+            ]
+
+        response = f"# Type Defaults for {datatype.upper()}\n\n"
+
+        if isinstance(result, dict):
+            for key, value in result.items():
+                response += f"- {key}: {value}\n"
+        else:
+            response += str(result)
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "type defaults retrieval")
+
+
+@with_client
+async def get_types_default_map_tool(client, arguments) -> List[TextContent]:
+    """
+    Get type default mapping for a data type.
+
+    Returns type mappings used for API translations.
+    """
+    try:
+        datatype = _get_arg(arguments, "datatype")
+        if not datatype:
+            raise ValueError("datatype is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_TYPES_DEFAULT_MAP,
+            params=None,
+            tree_id=tree_id,
+            datatype=datatype,
+        )
+
+        if not result:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No type mapping found for datatype: {datatype}",
+                )
+            ]
+
+        response = f"# Type Mapping for {datatype.upper()}\n\n"
+
+        if isinstance(result, dict):
+            for from_val, to_val in result.items():
+                response += f"- {from_val} → {to_val}\n"
+        else:
+            response += str(result)
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "type mapping retrieval")
+
+
+# ============================================================================
+# Extended Analysis Tools (1 tool)
+# ============================================================================
+
+
+@with_client
+async def get_living_dates_tool(client, arguments) -> List[TextContent]:
+    """
+    Get living status and estimated dates for a person.
+
+    Returns whether a person is estimated to be living and date estimates.
+    """
+    try:
+        gramps_id = _get_arg(arguments, "gramps_id")
+        if not gramps_id:
+            raise ValueError("gramps_id is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get person handle from gramps_id
+        from .search_basic import _gramps_id_to_handle
+        handle = await _gramps_id_to_handle(client, gramps_id, tree_id)
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_LIVING_DATES,
+            params=None,
+            tree_id=tree_id,
+            gramps_id_or_handle=handle,
+        )
+
+        if not result:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No living status information found for {gramps_id}.",
+                )
+            ]
+
+        is_living = result.get("living", False)
+        estimated_birth = result.get("estimated_birth")
+        estimated_death = result.get("estimated_death")
+
+        response = f"# Living Status for {gramps_id}\n\n"
+        response += f"**Estimated Living**: {is_living}\n"
+
+        if estimated_birth:
+            response += f"**Estimated Birth Year**: {estimated_birth}\n"
+        if estimated_death:
+            response += f"**Estimated Death Year**: {estimated_death}\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "living dates retrieval")
