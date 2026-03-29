@@ -163,6 +163,114 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         if event_list:
             result += f"Events: {', '.join(event_list)}\n"
 
+        # Tags (via extended.tags for tag names)
+        tag_list = person_data.get("tag_list", [])
+        if tag_list:
+            extended_tags = extended.get("tags", [])
+            tag_name_map = {t.get("handle"): t.get("name", "") for t in extended_tags}
+            tag_names = [tag_name_map.get(h, h) for h in tag_list if h]
+            if tag_names:
+                result += f"Tags: {', '.join(tag_names)}\n"
+
+        # Attributes (attribute_list)
+        attribute_list = person_data.get("attribute_list", [])
+        if attribute_list:
+            attr_strs = []
+            for attr in attribute_list:
+                attr_type = attr.get("type", "")
+                if isinstance(attr_type, dict):
+                    attr_type = attr_type.get("string", "") or attr_type.get("_class", "")
+                attr_value = attr.get("value", "")
+                if attr_type and attr_value:
+                    attr_strs.append(f"{attr_type}: {attr_value}")
+            if attr_strs:
+                result += f"Attributes: {'; '.join(attr_strs)}\n"
+
+        # Associations (person_ref_list — godparent, friend, etc.)
+        person_ref_list = person_data.get("person_ref_list", [])
+        if person_ref_list:
+            extended_people = extended.get("people", [])
+            person_map = {}
+            for p in extended_people:
+                p_handle = p.get("handle", "")
+                pn = p.get("primary_name", {})
+                given = pn.get("first_name", "")
+                surnames = pn.get("surname_list", [])
+                surname = surnames[0].get("surname", "") if surnames else ""
+                person_map[p_handle] = f"{given} {surname}".strip()
+            assoc_strs = []
+            for ref in person_ref_list:
+                ref_handle = ref.get("ref", "")
+                rel = ref.get("rel", "")
+                ref_name = person_map.get(ref_handle, ref_handle)
+                if ref_name and rel:
+                    assoc_strs.append(f"{ref_name} ({rel})")
+                elif ref_name:
+                    assoc_strs.append(ref_name)
+            if assoc_strs:
+                result += f"Associations: {', '.join(assoc_strs)}\n"
+
+        # Addresses (address_list)
+        address_list = person_data.get("address_list", [])
+        if address_list:
+            result += "Addresses:\n"
+            for addr in address_list:
+                addr_date = format_date(addr.get("date", {}))
+                parts = [
+                    addr.get("street", ""),
+                    addr.get("locality", ""),
+                    addr.get("city", ""),
+                    addr.get("county", ""),
+                    addr.get("state", ""),
+                    addr.get("postal", ""),
+                    addr.get("country", ""),
+                ]
+                addr_str = ", ".join(p for p in parts if p)
+                phone = addr.get("phone", "")
+                line = f"  {addr_str}"
+                if phone:
+                    line += f" | {phone}"
+                if addr_date:
+                    line += f" ({addr_date})"
+                result += line + "\n"
+
+        # Direct citations on the person record (citation_list via extended.citations)
+        citation_list = person_data.get("citation_list", [])
+        if citation_list:
+            extended_citations = extended.get("citations", [])
+            citation_id_map = {c.get("handle"): c.get("gramps_id", "") for c in extended_citations}
+            citation_ids = [citation_id_map.get(h, h) for h in citation_list if h]
+            if citation_ids:
+                result += f"Citations: {', '.join(citation_ids)}\n"
+
+        # LDS ordinations (lds_ord_list)
+        lds_ord_list = person_data.get("lds_ord_list", [])
+        if lds_ord_list:
+            lds_type_map = {
+                0: "Baptism", 1: "Endowment", 2: "Seal to Parents",
+                3: "Seal to Spouse", 4: "Confirmation",
+            }
+            lds_status_map = {
+                0: "None", 1: "BIC", 2: "Cancelled", 3: "Child",
+                4: "Cleared", 5: "Completed", 6: "DNS", 7: "Infant",
+                8: "Pre-1970", 9: "Qualified", 10: "DNS/CAN",
+                11: "Stillborn", 12: "Submitted", 13: "Uncleared",
+            }
+            result += "LDS Ordinations:\n"
+            for lds in lds_ord_list:
+                lds_type = lds_type_map.get(lds.get("type"), str(lds.get("type", "")))
+                lds_date = format_date(lds.get("date", {}))
+                temple = lds.get("temple", "")
+                status = lds_status_map.get(lds.get("status"), "")
+                line = f"  {lds_type}"
+                if lds_date:
+                    line += f" - {lds_date}"
+                if temple:
+                    line += f" @ {temple}"
+                if status:
+                    line += f" [{status}]"
+                result += line + "\n"
+
         # Attached media
         media_list = person_data.get("media_list", [])
         if media_list:
