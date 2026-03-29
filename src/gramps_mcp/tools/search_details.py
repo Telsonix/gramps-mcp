@@ -30,10 +30,10 @@ from ..client import GrampsAPIError, GrampsWebAPIClient
 from ..config import get_settings
 from ..handlers.citation_handler import format_citation
 from ..handlers.event_handler import format_event
-from ..handlers.family_detail_handler import format_family_detail
+from ..handlers.family_handler import format_family
 from ..handlers.media_handler import format_media
 from ..handlers.note_handler import format_note
-from ..handlers.person_detail_handler import format_person_detail
+from ..handlers.person_handler import format_person
 from ..handlers.place_handler import format_place
 from ..handlers.repository_handler import format_repository
 from ..handlers.source_handler import format_source
@@ -122,8 +122,8 @@ async def _get_entity_impl(client, entity_type: str, handle: str) -> List[TextCo
         tree_id = settings.gramps_tree_id
 
         format_fn_map = {
-            "person": lambda: format_person_detail(client, tree_id, handle),
-            "family": lambda: format_family_detail(client, tree_id, handle),
+            "person": lambda: format_person(client, tree_id, handle),
+            "family": lambda: format_family(client, tree_id, handle),
             "event": lambda: format_event(client, tree_id, handle),
             "place": lambda: format_place(client, tree_id, handle),
             "source": lambda: format_source(client, tree_id, handle),

@@ -120,6 +120,30 @@ class PersonData(BaseDataModel):
                 f"Invalid gender '{v}'. Use 'Male', 'Female', or 'Unknown' (or 0/1/2)."
             )
         raise ValueError(f"gender must be an int or string, got {type(v)}")
+
+    @field_validator("urls", mode="before")
+    @classmethod
+    def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that urls items are dictionaries, not strings."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(
+                f"urls must be a list of dictionaries, got {type(v).__name__}"
+            )
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"urls[{i}]: URL must be a dictionary with keys like 'path', 'type', 'desc', "
+                    f"not a string. Got '{item}'. "
+                    f"Correct format: {{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Description'}}"
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
+                )
+        return v
+
     alternate_names: Optional[List[Dict[str, Any]]] = Field(
         None,
         description=(
@@ -138,7 +162,14 @@ class PersonData(BaseDataModel):
         None, description="List of handles for families of the person's parents"
     )
     urls: Optional[List[Dict[str, Any]]] = Field(
-        None, description="List of URLs associated with the person"
+        None,
+        description=(
+            "List of URLs as dictionaries. Each URL should have optional keys: "
+            "'path' (the URL itself), 'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
+            "Example: [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}, "
+            "{'path': 'https://findagrave.com/memorial/123', 'type': 'Web Home', 'desc': 'Find A Grave'}]. "
+            "Note: All keys are optional, but at least 'path' is recommended. Must be list of {dict}, not strings."
+        ),
     )
 
 

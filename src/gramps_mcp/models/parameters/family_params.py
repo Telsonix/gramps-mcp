@@ -28,7 +28,7 @@ API calls supported in this category:
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_serializer
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 
 class ChildReference(BaseModel):
@@ -56,18 +56,140 @@ class FamilySaveParams(BaseModel):
     )
     child_ref_list: Optional[List[Dict[str, Any]]] = Field(
         None,
-        description="List of child references with relationship details",
+        description=(
+            "List of child references as dictionaries. Each reference must have 'ref' key (child handle). "
+            "Example: [{'ref': 'child_handle_1'}, {'ref': 'child_handle_2', 'frel': 'Birth', 'mrel': 'Birth'}]. "
+            "Optional keys: 'frel' (father relationship, default 'Birth'), 'mrel' (mother relationship, default 'Birth'), "
+            "'citation_list' (citation handles), 'note_list' (note handles), 'private' (boolean)"
+        ),
     )
     event_ref_list: Optional[List[dict]] = Field(
-        None, description="List of event references"
+        None,
+        description=(
+            "List of event references as dictionaries. Each reference must have 'ref' key (event handle). "
+            "Example: [{'ref': 'event_handle', 'role': 'Primary'}]. "
+            "Optional keys: 'role' (role in event), 'attribute_list' (attributes), 'note_list' (note handles), 'private' (boolean)"
+        ),
     )
     note_list: Optional[List[str]] = Field(None, description="List of note handles")
     urls: Optional[List[dict]] = Field(
-        None, description="List of URLs associated with the family"
+        None,
+        description=(
+            "List of URLs as dictionaries with optional keys 'path', 'type', 'desc', 'private'. "
+            "Example: [{'path': 'https://example.com', 'type': 'Web Home'}]"
+        ),
     )
     media_list: Optional[List[dict]] = Field(
-        None, description="List of media references"
+        None,
+        description=(
+            "List of media references as dictionaries. Each reference must have 'ref' key (media handle). "
+            "Example: [{'ref': 'media_handle'}]. Optional keys: 'attribute_list', 'citation_list', 'note_list', 'private', 'rect'"
+        ),
     )
+
+    @field_validator("child_ref_list", mode="before")
+    @classmethod
+    def validate_child_ref_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that child_ref_list items are dictionaries with 'ref' key."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(
+                f"child_ref_list must be a list of dictionaries, got {type(v).__name__}"
+            )
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"child_ref_list[{i}]: Child reference must be a dictionary with 'ref' key, "
+                    f"not a string. Got '{item}'. "
+                    f"Correct format: {{'ref': 'child_handle'}}"
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"child_ref_list[{i}]: Each child reference must be a dictionary, got {type(item).__name__}"
+                )
+            if "ref" not in item:
+                raise ValueError(
+                    f"child_ref_list[{i}]: Missing required 'ref' key (child handle). "
+                    f"Correct format: {{'ref': 'child_handle'}}"
+                )
+        return v
+
+    @field_validator("event_ref_list", mode="before")
+    @classmethod
+    def validate_event_ref_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that event_ref_list items are dictionaries with 'ref' key."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(
+                f"event_ref_list must be a list of dictionaries, got {type(v).__name__}"
+            )
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"event_ref_list[{i}]: Event reference must be a dictionary with 'ref' key, "
+                    f"not a string. Got '{item}'. "
+                    f"Correct format: {{'ref': 'event_handle'}}"
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"event_ref_list[{i}]: Each event reference must be a dictionary, got {type(item).__name__}"
+                )
+            if "ref" not in item:
+                raise ValueError(
+                    f"event_ref_list[{i}]: Missing required 'ref' key (event handle). "
+                    f"Correct format: {{'ref': 'event_handle'}}"
+                )
+        return v
+
+    @field_validator("urls", mode="before")
+    @classmethod
+    def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that urls items are dictionaries, not strings."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(f"urls must be a list of dictionaries, got {type(v).__name__}")
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"urls[{i}]: URL must be a dictionary, not a string. Got '{item}'. "
+                    f"Correct format: {{'path': 'https://example.com', 'type': 'Web Home'}}"
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
+                )
+        return v
+
+    @field_validator("media_list", mode="before")
+    @classmethod
+    def validate_media_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that media_list items are dictionaries with 'ref' key."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(
+                f"media_list must be a list of dictionaries, got {type(v).__name__}"
+            )
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"media_list[{i}]: Media reference must be a dictionary with 'ref' key, "
+                    f"not a string. Got '{item}'. "
+                    f"Correct format: {{'ref': 'media_handle'}}"
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"media_list[{i}]: Each media reference must be a dictionary, got {type(item).__name__}"
+                )
+            if "ref" not in item:
+                raise ValueError(
+                    f"media_list[{i}]: Missing required 'ref' key (media handle). "
+                    f"Correct format: {{'ref': 'media_handle'}}"
+                )
+        return v
 
     @model_serializer
     def serialize_model(self) -> Dict[str, Any]:

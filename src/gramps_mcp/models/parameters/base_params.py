@@ -157,11 +157,88 @@ class BaseDataModel(BaseModel):
         None, description="List of handles for notes"
     )
     media_list: Optional[List[Dict[str, Any]]] = Field(
-        None, description="List of references to media"
+        None,
+        description=(
+            "List of media references as dictionaries. Each reference requires 'ref' key with media handle. "
+            "Example: [{'ref': 'media_handle_123'}, {'ref': 'another_handle', 'private': True}]. "
+            "Optional keys: 'attribute_list' (array of attributes), 'citation_list' (citation handles), "
+            "'note_list' (note handles), 'private' (boolean), 'rect' (rectangle [x,y,w,h] for media area). "
+            "Common mistake: passing a string instead of dict—must be list of {dict}."
+        ),
     )
     attribute_list: Optional[List[Dict[str, Any]]] = Field(
-        None, description="List of attributes"
+        None,
+        description=(
+            "List of attributes as dictionaries. Each attribute must have 'type' and 'value' keys. "
+            "Example: [{'type': 'Social Security Number', 'value': '123-45-6789'}, "
+            "{'type': 'National Origin', 'value': 'Scottish', 'private': True}]. "
+            "Optional keys: 'citation_list' (array of citation handles), "
+            "'note_list' (array of note handles), 'private' (boolean)"
+        ),
     )
+
+    @field_validator("attribute_list", mode="before")
+    @classmethod
+    def validate_attribute_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that attribute_list items are dictionaries with required keys."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(
+                f"attribute_list must be a list of dictionaries, got {type(v).__name__}"
+            )
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"attribute_list[{i}]: Attribute must be a dictionary with 'type' and 'value' keys, "
+                    f"not a string. Got '{item}'. "
+                    f"Correct format: {{'type': 'AttributeType', 'value': 'value_here'}} "
+                    f"or similar."
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"attribute_list[{i}]: Each attribute must be a dictionary, got {type(item).__name__}"
+                )
+            if "type" not in item:
+                raise ValueError(
+                    f"attribute_list[{i}]: Missing required 'type' key. "
+                    f"Correct format: {{'type': 'AttributeType', 'value': 'value_here'}}"
+                )
+            if "value" not in item:
+                raise ValueError(
+                    f"attribute_list[{i}]: Missing required 'value' key. "
+                    f"Correct format: {{'type': 'AttributeType', 'value': 'value_here'}}"
+                )
+        return v
+
+    @field_validator("media_list", mode="before")
+    @classmethod
+    def validate_media_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Validate that media_list items are dictionaries with required 'ref' key."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError(
+                f"media_list must be a list of dictionaries, got {type(v).__name__}"
+            )
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                raise ValueError(
+                    f"media_list[{i}]: Media reference must be a dictionary with 'ref' key, "
+                    f"not a string. Got '{item}'. "
+                    f"Correct format: {{'ref': 'media_handle'}} or {{'ref': 'media_handle', 'private': True}}"
+                )
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"media_list[{i}]: Each media reference must be a dictionary, got {type(item).__name__}"
+                )
+            if "ref" not in item:
+                raise ValueError(
+                    f"media_list[{i}]: Missing required 'ref' key (media handle). "
+                    f"Correct format: {{'ref': 'media_handle'}}"
+                )
+        return v
+
     tag_list: Optional[List[str]] = Field(None, description="List of handles to tags")
     private: Optional[bool] = Field(None, description="Whether the object is private")
     change: Optional[int] = Field(
