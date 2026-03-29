@@ -55,7 +55,7 @@ async def format_event(
             api_call=ApiCalls.GET_EVENT,
             tree_id=tree_id,
             handle=handle,
-            params={"extend": "backlinks", "backlinks": True},
+            params={"extend": "all", "backlinks": True},
         )
         if not event_data:
             if event_label:
@@ -77,6 +77,7 @@ async def format_event(
         # Otherwise return full search result format
         gramps_id = event_data.get("gramps_id", "")
         event_type = event_data.get("type", "Unknown Event")
+        description = event_data.get("description", "").strip()
         citation_list = event_data.get("citation_list", [])
         note_list = event_data.get("note_list", [])
 
@@ -111,7 +112,11 @@ async def format_event(
                     primary_person_name = full_name
 
                 # Add to participants list
-                participants.append(f"{role} ({person_gramps_id})")
+                person_handle_p = person.get("handle", "")
+                entry = f"{role} ({person_gramps_id})"
+                if person_handle_p:
+                    entry += f" [{person_handle_p}]"
+                participants.append(entry)
 
         # Check for family backlinks (family events like marriage, divorce)
         if "family" in backlinks:
@@ -146,7 +151,9 @@ async def format_event(
                             full_name = f"{first_name} {surname}".strip()
 
                             family_participants.append(full_name)
-                            participants.append(f"Husband ({father_gramps_id})")
+                            participants.append(
+                                f"Husband ({father_gramps_id}) [{father_handle}]"
+                            )
                     except Exception:
                         continue
 
@@ -171,7 +178,9 @@ async def format_event(
                             full_name = f"{first_name} {surname}".strip()
 
                             family_participants.append(full_name)
-                            participants.append(f"Wife ({mother_gramps_id})")
+                            participants.append(
+                                f"Wife ({mother_gramps_id}) [{mother_handle}]"
+                            )
                     except Exception:
                         continue
 
@@ -192,6 +201,10 @@ async def format_event(
 
         if date_place_parts:
             result += f"\n{' - '.join(date_place_parts)}"
+
+        # Description
+        if description:
+            result += f"\nDescription: {description}"
 
         # Third line: participants: role (gramps_id), role (gramps_id)
         if participants:
@@ -216,7 +229,9 @@ async def format_event(
                         if citation_data:
                             citation_gramps_id = citation_data.get("gramps_id", "")
                             if citation_gramps_id:
-                                citation_ids.append(citation_gramps_id)
+                                citation_ids.append(
+                                    f"{citation_gramps_id} [{citation_handle}]"
+                                )
                     except Exception:
                         continue
 
@@ -234,12 +249,65 @@ async def format_event(
                     if note_data:
                         note_gramps_id = note_data.get("gramps_id", "")
                         if note_gramps_id:
-                            note_ids.append(note_gramps_id)
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
                 except Exception:
                     continue
 
             if note_ids:
                 result += f"\nAttached notes: {', '.join(note_ids)}"
+
+        # Tags
+        tag_list = event_data.get("tag_list", [])
+        if tag_list:
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"\nTags: {', '.join(tag_strs)}"
+
+        # Attached media
+        media_list = event_data.get("media_list", [])
+        if media_list:
+            media_ids = []
+            for media_ref in media_list:
+                if isinstance(media_ref, dict):
+                    media_handle = media_ref.get("ref", "")
+                    if media_handle:
+                        try:
+                            media_data = await client.make_api_call(
+                                api_call=ApiCalls.GET_MEDIA_ITEM,
+                                tree_id=tree_id,
+                                handle=media_handle,
+                            )
+                            if media_data:
+                                media_gramps_id = media_data.get("gramps_id", "")
+                                if media_gramps_id:
+                                    media_ids.append(
+                                        f"{media_gramps_id} [{media_handle}]"
+                                    )
+                        except Exception:
+                            continue
+            if media_ids:
+                result += f"\nAttached media: {', '.join(media_ids)}"
+
+        # Attributes
+        attribute_list = event_data.get("attribute_list", [])
+        if attribute_list:
+            attr_strs = [
+                f"{a.get('type', '')}: {a.get('value', '')}"
+                for a in attribute_list
+                if a.get("type") or a.get("value")
+            ]
+            if attr_strs:
+                result += f"\nAttributes: {'; '.join(attr_strs)}"
 
         return result + "\n\n"
 

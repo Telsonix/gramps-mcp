@@ -49,7 +49,7 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
             api_call=ApiCalls.GET_CITATION,
             tree_id=tree_id,
             handle=handle,
-            params={"extend": "backlinks", "backlinks": True},
+            params={"extend": "all", "backlinks": True},
         )
         if not citation_data:
             return f"• **Citation {handle}**\n  Citation not found\n\n"
@@ -57,13 +57,16 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
         gramps_id = citation_data.get("gramps_id", "")
         page = citation_data.get("page", "").strip()
         source_handle = citation_data.get("source_handle", "")
+        confidence = citation_data.get("confidence", -1)
         date = citation_data.get("date", {})
         media_list = citation_data.get("media_list", [])
         note_list = citation_data.get("note_list", [])
-        citation_data.get("backlinks", {})
+        # Extract extended early for tags and backlinks
+        extended = citation_data.get("extended", {})
 
-        # Get source title
+        # Get source title and gramps_id
         source_title = ""
+        source_gramps_id = ""
         if source_handle:
             try:
                 source_data = await client.make_api_call(
@@ -71,6 +74,7 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
                 )
                 if source_data:
                     source_title = source_data.get("title", "").strip()
+                    source_gramps_id = source_data.get("gramps_id", "")
             except Exception:
                 pass
 
@@ -86,6 +90,18 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
         else:
             first_line = f" - {gramps_id} - [{handle}]"
         result = first_line
+
+        # Source navigation reference
+        if source_handle:
+            src_ref = f"Source: {source_gramps_id} [{source_handle}]" if source_gramps_id else f"Source: [{source_handle}]"
+            result += f"\n{src_ref}"
+
+        # Confidence level
+        if confidence >= 0:
+            confidence_labels = {
+                0: "Very Low", 1: "Low", 2: "Normal", 3: "High", 4: "Very High"
+            }
+            result += f"\nConfidence: {confidence_labels.get(confidence, str(confidence))}"
 
         # Date line
         if date:
@@ -109,7 +125,9 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
                             if media_data:
                                 media_gramps_id = media_data.get("gramps_id", "")
                                 if media_gramps_id:
-                                    media_ids.append(media_gramps_id)
+                                    media_ids.append(
+                                        f"{media_gramps_id} [{media_handle}]"
+                                    )
                         except Exception:
                             continue
 
@@ -127,15 +145,42 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
                     if note_data:
                         note_gramps_id = note_data.get("gramps_id", "")
                         if note_gramps_id:
-                            note_ids.append(note_gramps_id)
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
                 except Exception:
                     continue
 
             if note_ids:
                 result += f"\nAttached notes: {', '.join(note_ids)}"
 
+        # Tags
+        tag_list = citation_data.get("tag_list", [])
+        if tag_list:
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"\nTags: {', '.join(tag_strs)}"
+
+        # Attributes
+        attribute_list = citation_data.get("attribute_list", [])
+        if attribute_list:
+            attr_strs = [
+                f"{a.get('type', '')}: {a.get('value', '')}"
+                for a in attribute_list
+                if a.get("type") or a.get("value")
+            ]
+            if attr_strs:
+                result += f"\nAttributes: {'; '.join(attr_strs)}"
+
         # Attached to: gramps ids of backlinks (using extended data)
-        extended = citation_data.get("extended", {})
         extended_backlinks = extended.get("backlinks", {})
 
         if isinstance(extended_backlinks, dict) and extended_backlinks:
@@ -148,8 +193,12 @@ async def format_citation(client, tree_id: str, handle: str) -> str:
                     for entity in entities:
                         if isinstance(entity, dict):
                             entity_gramps_id = entity.get("gramps_id", "")
+                            entity_handle_val = entity.get("handle", "")
                             if entity_gramps_id:
-                                backlink_ids.append(entity_gramps_id)
+                                entry = f"{entity_gramps_id}"
+                                if entity_handle_val:
+                                    entry += f" [{entity_handle_val}]"
+                                backlink_ids.append(entry)
 
             if backlink_ids:
                 result += f"\nAttached to: {', '.join(backlink_ids)}"

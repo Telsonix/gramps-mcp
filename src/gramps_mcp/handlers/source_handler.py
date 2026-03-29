@@ -44,7 +44,10 @@ async def format_source(client, tree_id: str, handle: str) -> str:
 
     try:
         source_data = await client.make_api_call(
-            api_call=ApiCalls.GET_SOURCE, tree_id=tree_id, handle=handle
+            api_call=ApiCalls.GET_SOURCE,
+            tree_id=tree_id,
+            handle=handle,
+            params={"extend": "all"},
         )
         if not source_data:
             return f"• **Source {handle}**\n  Source not found\n\n"
@@ -52,6 +55,7 @@ async def format_source(client, tree_id: str, handle: str) -> str:
         gramps_id = source_data.get("gramps_id", "")
         title = source_data.get("title", "").strip()
         author = source_data.get("author", "").strip()
+        abbrev = source_data.get("abbrev", "").strip()
         pubinfo = source_data.get("pubinfo", "").strip()
         note_list = source_data.get("note_list", [])
         reporef_list = source_data.get("reporef_list", [])
@@ -70,6 +74,10 @@ async def format_source(client, tree_id: str, handle: str) -> str:
                 second_line_parts.append(pubinfo)
             result += f"\n{' - '.join(second_line_parts)}"
 
+        # Abbreviation
+        if abbrev:
+            result += f"\nAbbrev: {abbrev}"
+
         # Repository info: repo name - gramps id
         for reporef in reporef_list:
             if not isinstance(reporef, dict):
@@ -87,8 +95,15 @@ async def format_source(client, tree_id: str, handle: str) -> str:
                 if repo_data:
                     repo_name = repo_data.get("name", "").strip()
                     repo_gramps_id = repo_data.get("gramps_id", "")
-                    if repo_name and repo_gramps_id:
-                        result += f"\n{repo_name} - {repo_gramps_id}"
+                    call_number = reporef.get("call_number", "").strip()
+                    media_type = reporef.get("media_type", "").strip()
+                    if repo_name or repo_gramps_id:
+                        line = f"{repo_name} - {repo_gramps_id} [{repo_handle}]"
+                        if call_number:
+                            line += f" (Call: {call_number})"
+                        if media_type:
+                            line += f" ({media_type})"
+                        result += f"\n{line}"
             except Exception:
                 continue
 
@@ -108,7 +123,9 @@ async def format_source(client, tree_id: str, handle: str) -> str:
                             if media_data:
                                 media_gramps_id = media_data.get("gramps_id", "")
                                 if media_gramps_id:
-                                    media_ids.append(media_gramps_id)
+                                    media_ids.append(
+                                        f"{media_gramps_id} [{media_handle}]"
+                                    )
                         except Exception:
                             continue
 
@@ -126,12 +143,41 @@ async def format_source(client, tree_id: str, handle: str) -> str:
                     if note_data:
                         note_gramps_id = note_data.get("gramps_id", "")
                         if note_gramps_id:
-                            note_ids.append(note_gramps_id)
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
                 except Exception:
                     continue
 
             if note_ids:
                 result += f"\nAttached notes: {', '.join(note_ids)}"
+
+        # Tags
+        tag_list = source_data.get("tag_list", [])
+        if tag_list:
+            extended = source_data.get("extended", {})
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"\nTags: {', '.join(tag_strs)}"
+
+        # Attributes
+        attribute_list = source_data.get("attribute_list", [])
+        if attribute_list:
+            attr_strs = [
+                f"{a.get('type', '')}: {a.get('value', '')}"
+                for a in attribute_list
+                if a.get("type") or a.get("value")
+            ]
+            if attr_strs:
+                result += f"\nAttributes: {'; '.join(attr_strs)}"
 
         return result + "\n\n"
 

@@ -23,6 +23,7 @@ Provides clean, direct formatting of repository data from handles.
 import logging
 
 from ..models.api_calls import ApiCalls
+from .date_handler import format_date
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,10 @@ async def format_repository(client, tree_id: str, handle: str) -> str:
 
     try:
         repo_data = await client.make_api_call(
-            api_call=ApiCalls.GET_REPOSITORY, tree_id=tree_id, handle=handle
+            api_call=ApiCalls.GET_REPOSITORY,
+            tree_id=tree_id,
+            handle=handle,
+            params={"extend": "all"},
         )
         if not repo_data:
             return ""
@@ -56,6 +60,24 @@ async def format_repository(client, tree_id: str, handle: str) -> str:
         # First line: type: name - gramps_id - [handle]
         first_line = f"{repo_type}: {name} - {gramps_id} - [{handle}]"
         result = first_line
+
+        # Tags
+        tag_list = repo_data.get("tag_list", [])
+        if tag_list:
+            extended = repo_data.get("extended", {})
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"\nTags: {', '.join(tag_strs)}"
 
         # Add URLs if present
         urls = repo_data.get("urls", [])
@@ -80,12 +102,36 @@ async def format_repository(client, tree_id: str, handle: str) -> str:
                     if note_data:
                         note_gramps_id = note_data.get("gramps_id", "")
                         if note_gramps_id:
-                            note_ids.append(note_gramps_id)
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
                 except Exception:
                     continue
 
             if note_ids:
                 result += f"\nAttached notes: {', '.join(note_ids)}"
+
+        # Addresses
+        address_list = repo_data.get("address_list", [])
+        if address_list:
+            result += "\nAddresses:"
+            for addr in address_list:
+                addr_date = format_date(addr.get("date", {}))
+                parts = [
+                    addr.get("street", ""),
+                    addr.get("locality", ""),
+                    addr.get("city", ""),
+                    addr.get("state", ""),
+                    addr.get("postal", ""),
+                    addr.get("country", ""),
+                ]
+                addr_parts = [p for p in parts if p]
+                addr_str = ", ".join(addr_parts)
+                if addr_date and addr_date != "date unknown":
+                    addr_str += f" ({addr_date})"
+                if addr_str:
+                    result += f"\n  {addr_str}"
+                phone = addr.get("phone", "")
+                if phone:
+                    result += f"\n  Phone: {phone}"
 
         return result + "\n\n"
 

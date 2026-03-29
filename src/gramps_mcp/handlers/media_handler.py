@@ -45,7 +45,10 @@ async def format_media(client, tree_id: str, handle: str) -> str:
 
     try:
         media_data = await client.make_api_call(
-            api_call=ApiCalls.GET_MEDIA_ITEM, tree_id=tree_id, handle=handle
+            api_call=ApiCalls.GET_MEDIA_ITEM,
+            tree_id=tree_id,
+            handle=handle,
+            params={"extend": "all"},
         )
         if not media_data:
             return f"**Media {handle}**\n  Media not found\n\n"
@@ -67,10 +70,86 @@ async def format_media(client, tree_id: str, handle: str) -> str:
 
         # New format: file type - gramps id - [handle] \n desc - date
         file_type = mime if mime else "unknown type"
-        first_line = f"{file_type} - {gramps_id} - [{handle}]"
-        second_line = f"{formatted_desc}{formatted_date}"
+        result = f"{file_type} - {gramps_id} - [{handle}]\n"
+        result += f"{formatted_desc}{formatted_date}\n"
 
-        return f"{first_line}\n{second_line}\n\n"
+        # File path
+        path = media_data.get("path", "")
+        if path:
+            result += f"Path: {path}\n"
+
+        # Tags
+        tag_list = media_data.get("tag_list", [])
+        if tag_list:
+            extended = media_data.get("extended", {})
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"Tags: {', '.join(tag_strs)}\n"
+
+        # Attributes
+        attribute_list = media_data.get("attribute_list", [])
+        if attribute_list:
+            attr_strs = [
+                f"{a.get('type', '')}: {a.get('value', '')}"
+                for a in attribute_list
+                if a.get("type") or a.get("value")
+            ]
+            if attr_strs:
+                result += f"Attributes: {'; '.join(attr_strs)}\n"
+
+        # Attached citations
+        citation_list = media_data.get("citation_list", [])
+        if citation_list:
+            citation_ids = []
+            for citation_handle in citation_list:
+                try:
+                    citation_data = await client.make_api_call(
+                        api_call=ApiCalls.GET_CITATION,
+                        tree_id=tree_id,
+                        handle=citation_handle,
+                    )
+                    if citation_data:
+                        citation_gramps_id = citation_data.get("gramps_id", "")
+                        if citation_gramps_id:
+                            citation_ids.append(
+                                f"{citation_gramps_id} [{citation_handle}]"
+                            )
+                except Exception:
+                    continue
+            if citation_ids:
+                result += f"Attached citations: {', '.join(citation_ids)}\n"
+
+        # Attached notes
+        note_list = media_data.get("note_list", [])
+        if note_list:
+            note_ids = []
+            for note_handle in note_list:
+                try:
+                    note_data = await client.make_api_call(
+                        api_call=ApiCalls.GET_NOTE,
+                        tree_id=tree_id,
+                        handle=note_handle,
+                    )
+                    if note_data:
+                        note_gramps_id = note_data.get("gramps_id", "")
+                        if note_gramps_id:
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
+                except Exception:
+                    continue
+            if note_ids:
+                result += f"Attached notes: {', '.join(note_ids)}\n"
+
+        return result + "\n"
 
     except Exception as e:
         logger.debug(f"Failed to format media {handle}: {e}")

@@ -375,6 +375,44 @@ async def find_note_tool(client, arguments: Dict) -> List[TextContent]:
     )
 
 
+async def _gramps_id_to_handle(client, gramps_id: str, tree_id: str) -> str:
+    """
+    Convert a Gramps ID to a person handle.
+
+    Args:
+        client: Gramps API client
+        gramps_id: Gramps ID (e.g., 'I0001')
+        tree_id: Tree ID for the search
+
+    Returns:
+        str: The person's internal handle
+
+    Raises:
+        GrampsAPIError: If person not found
+    """
+    # Search for person by gramps_id using GQL
+    result = await client.make_api_call(
+        api_call=ApiCalls.GET_SEARCH,
+        params={"gql": f'gramps_id = "{gramps_id}"', "pagesize": 1},
+        tree_id=tree_id,
+    )
+
+    if not result or not result.get("results"):
+        raise GrampsAPIError(f"Person not found: {gramps_id}")
+
+    results = result.get("results", [])
+    if not results:
+        raise GrampsAPIError(f"Person not found: {gramps_id}")
+
+    # Extract handle from first result
+    first_result = results[0]
+    handle = first_result.get("handle")
+    if not handle:
+        raise GrampsAPIError(f"No handle found for {gramps_id}")
+
+    return handle
+
+
 async def find_type_tool(arguments) -> List[TextContent]:
     """Universal type-based search tool."""
     from pydantic import BaseModel

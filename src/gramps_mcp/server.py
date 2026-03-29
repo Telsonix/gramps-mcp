@@ -54,10 +54,25 @@ from .models.parameters.transactions_params import TransactionHistoryParams
 from .models.parameters.delete_params import DeleteParams
 from .models.parameters.relations_params import RelationParams
 from .models.parameters.tag_params import TagSaveParams, TagSearchParams
-from .models.parameters.living_params import LivingParams
+from .models.parameters.living_params import LivingParams, LivingDatesParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.timeline_params import PeopleTimelineParams, FamiliesTimelineParams
 from .models.parameters.event_params import EventSpanParams
+from .models.parameters.holidays_params import HolidaysParams
+from .models.parameters.reports_params import ReportFileParams
+from .models.parameters.types_params import TypesParams
+from .models.parameters.dna_params import DNAMatchesParams, DnaParserParams
+from .models.parameters.task_params import TaskStatusParams
+from .models.parameters.trees_params import (
+    TreesListParams,
+    TreeDetailsParams,
+    HolidaysListParams,
+    ReportListParams,
+    ReportDetailsParams,
+    ReportFileDownloadParams,
+    SubmitReportParams,
+    ProcessedReportParams,
+)
 
 # Import all tool functions
 from .tools import (
@@ -83,24 +98,39 @@ from .tools import (
     delete_tag_tool,
     find_anything_tool,
     find_tags_tool,
+    find_type_tool,
     get_ancestors_tool,
     get_descendants_tool,
+    get_dna_matches_tool,
+    get_entity_tool,
+    get_event_span_tool,
     get_facts_tool,
     get_families_timeline_tool,
+    get_holiday_on_date_tool,
+    get_holidays_tool,
+    get_living_dates_tool,
     get_living_tool,
     get_media_file_tool,
     get_people_timeline_tool,
     get_recent_changes_tool,
     get_relations_all_tool,
     get_relations_tool,
+    get_report_file_tool,
+    get_report_processed_tool,
+    get_report_tool,
+    get_task_status_tool,
     get_tree_info_tool,
-    get_event_span_tool,
+    get_tree_tool,
+    get_trees_tool,
+    get_types_default_datatype_tool,
+    get_types_default_map_tool,
     get_types_tool,
+    list_reports_tool,
+    match_dna_parser_tool,
+    submit_report_file_tool,
     update_media_file_tool,
     upload_media_file_tool,
 )
-from .tools.search_basic import find_type_tool
-from .tools.search_details import get_type_tool
 
 
 # Simple analysis models for tools that use direct dict access
@@ -192,7 +222,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": SimpleSearchParams,
         "handler": find_anything_tool,
     },
-    "get_type": {
+    "get_entity": {
         "description": (
             "Get comprehensive details for any genealogy record by identifier. "
             "REQUIRED: type (person/family/event/place/source/citation/media/note/repository), "
@@ -209,7 +239,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Use this after find_type/find_anything to get full record data."
         ),
         "schema": SimpleGetParams,
-        "handler": get_type_tool,
+        "handler": get_entity_tool,
     },
     # ========================================================================
     # Data Management Tools — Create/Update (10 tools)
@@ -424,7 +454,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     # ========================================================================
     # Analysis & Lookup Tools (12 tools)
     # ========================================================================
-    "tree_stats": {
+    "get_tree_info": {
         "description": (
             "Get statistics about the entire family tree: total counts of people, families, "
             "events, places, sources, citations, media, notes, repositories. "
@@ -460,7 +490,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": AncestorsParams,
         "handler": get_ancestors_tool,
     },
-    "recent_changes": {
+    "get_recent_changes": {
         "description": (
             "Get a log of recent changes/modifications to the family tree. "
             "Shows what records were created, updated, or modified and when. "
@@ -690,6 +720,174 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
         "schema": EmptyParams,
         "handler": get_types_tool,
+    },
+    # ========================================================================
+    # DNA Matching Tools (2 tools)
+    # ========================================================================
+    "get_dna_matches": {
+        "description": (
+            "Get DNA matches for a person from the database. "
+            "REQUIRED: gramps_id (e.g., 'I0001'). "
+            "Returns list of DNA matches with relationship information and confidence levels. "
+            "Use for genealogical research and family connection validation."
+        ),
+        "schema": DNAMatchesParams,
+        "handler": get_dna_matches_tool,
+    },
+    "match_dna_parser": {
+        "description": (
+            "Submit a DNA match file for parsing and matching with database records. "
+            "REQUIRED: file_path (path to DNA match file). "
+            "OPTIONAL: file_format (default: 'gedcom'). "
+            "Triggers async parsing of DNA data and returns potential person matches. "
+            "Use for bulk DNA data import and matching."
+        ),
+        "schema": DnaParserParams,
+        "handler": match_dna_parser_tool,
+    },
+    # ========================================================================
+    # Reports System Tools (5 tools)
+    # ========================================================================
+    "list_reports": {
+        "description": (
+            "List all available reports in the database. "
+            "Returns all report definitions with IDs and descriptions. "
+            "No parameters required. "
+            "Use this to discover what reports are available before generating one."
+        ),
+        "schema": ReportListParams,
+        "handler": list_reports_tool,
+    },
+    "get_report": {
+        "description": (
+            "Get metadata and configuration for a specific report. "
+            "REQUIRED: report_id (the ID of the report). "
+            "Returns report name, description, configuration options, and status. "
+            "Use to see available options before submitting a report."
+        ),
+        "schema": ReportDetailsParams,
+        "handler": get_report_tool,
+    },
+    "get_report_file": {
+        "description": (
+            "Download a generated report file. "
+            "REQUIRED: report_id (the ID of the report). "
+            "Returns report file information including filename and size. "
+            "Use after report generation is complete."
+        ),
+        "schema": ReportFileDownloadParams,
+        "handler": get_report_file_tool,
+    },
+    "submit_report_file": {
+        "description": (
+            "Submit a file for report generation (async operation). "
+            "REQUIRED: report_id (the report type to generate). "
+            "OPTIONAL: options (JSON string with report options like '{\"pid\": \"I0001\"}')."
+            "Triggers async report generation and returns task ID for progress tracking. "
+            "Use get_task_status to check progress."
+        ),
+        "schema": SubmitReportParams,
+        "handler": submit_report_file_tool,
+    },
+    "get_report_processed": {
+        "description": (
+            "Get a processed report file with specific filename. "
+            "REQUIRED: report_id, filename (exact filename returned from report generation). "
+            "Returns fully processed report content, converted from HTML to markdown. "
+            "Use after successful report generation."
+        ),
+        "schema": ProcessedReportParams,
+        "handler": get_report_processed_tool,
+    },
+    # ========================================================================
+    # Task & Holidays Tools (3 tools)
+    # ========================================================================
+    "get_task_status": {
+        "description": (
+            "Get the status of an async task (e.g., report generation, DNA parsing). "
+            "REQUIRED: task_id (as returned from submit_report_file or similar). "
+            "Returns current state (PENDING/SUCCESS/FAILURE), progress %, and info. "
+            "Poll this periodically to track long-running operations."
+        ),
+        "schema": TaskStatusParams,
+        "handler": get_task_status_tool,
+    },
+    "get_holidays": {
+        "description": (
+            "Get list of holidays for a specific country and year. "
+            "OPTIONAL: country (default 'US'), year (default current year). "
+            "Returns holidays useful for genealogy event marking and timeline context. "
+            "Use for period-specific research context."
+        ),
+        "schema": HolidaysListParams,
+        "handler": get_holidays_tool,
+    },
+    "get_holiday_on_date": {
+        "description": (
+            "Get holiday information for a specific date. "
+            "REQUIRED: year, month, day. "
+            "OPTIONAL: country (default 'US'). "
+            "Returns name and description of any holiday on that date. "
+            "Use to check if a specific date was a significant holiday."
+        ),
+        "schema": HolidaysParams,
+        "handler": get_holiday_on_date_tool,
+    },
+    # ========================================================================
+    # Tree & Type System Tools (5 tools)
+    # ========================================================================
+    "get_trees": {
+        "description": (
+            "List all family trees in the database. "
+            "Returns information about all available trees including IDs, names, and owners. "
+            "No parameters required. "
+            "Use to discover which trees are available before querying one."
+        ),
+        "schema": TreesListParams,
+        "handler": get_trees_tool,
+    },
+    "get_tree": {
+        "description": (
+            "Get details of a specific family tree. "
+            "REQUIRED: tree_id (the ID of the tree). "
+            "Returns tree metadata, owner, person count, family count. "
+            "Use to get statistics and information about a specific tree."
+        ),
+        "schema": TreeDetailsParams,
+        "handler": get_tree_tool,
+    },
+    "get_types_default_datatype": {
+        "description": (
+            "Get type defaults for a specific datatype. "
+            "REQUIRED: datatype (e.g., 'event', 'person', 'family'). "
+            "Returns default values and settings for that datatype. "
+            "Use when creating records to ensure type consistency."
+        ),
+        "schema": TypesParams,
+        "handler": get_types_default_datatype_tool,
+    },
+    "get_types_default_map": {
+        "description": (
+            "Get type mapping for a specific datatype. "
+            "REQUIRED: datatype (e.g., 'event', 'person', 'family'). "
+            "Returns mapping of type values used in API translations. "
+            "Use for understanding type conversions and normalizations."
+        ),
+        "schema": TypesParams,
+        "handler": get_types_default_map_tool,
+    },
+    # ========================================================================
+    # Extended Analysis Tools (1 tool)
+    # ========================================================================
+    "get_living_dates": {
+        "description": (
+            "Get living status and estimated birth/death dates for a person. "
+            "REQUIRED: gramps_id (e.g., 'I0001'). "
+            "Returns whether person is estimated to be living and estimated date ranges. "
+            "Use for privacy assessment and timeline research."
+        ),
+        "schema": LivingDatesParams,
+        "handler": get_living_dates_tool,
     },
 }
 

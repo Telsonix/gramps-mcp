@@ -51,3 +51,15 @@ class LivingParams(BaseModel):
             "sibling"
         ),
     )
+
+
+class LivingDatesParams(BaseModel):
+    """
+    Parameters for getting living status and estimated dates for a person.
+
+    Args:
+        gramps_id (str): The Gramps ID of the person
+    """
+
+    gramps_id: str = Field(..., description="The Gramps ID of the person")
+

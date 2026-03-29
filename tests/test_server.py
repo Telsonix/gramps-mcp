@@ -81,7 +81,7 @@ class TestMCPServerSetup:
                 # Verify all expected tools are registered
                 expected_tools = {
                     # Simplified Search & Retrieval Tools (3)
-                    "find_type", "find_anything", "get_type",
+                    "find_type", "find_anything", "get_entity",
                     
                     # Data Creation & Management Tools (9) - keep unchanged
                     "create_person", "create_family", "create_event", "create_place",
@@ -89,10 +89,10 @@ class TestMCPServerSetup:
                     "create_repository",
                     
                     # Tree Management Tools (1)
-                    "tree_stats",
+                    "get_tree_info",
                     
                     # Analysis Tools (3)
-                    "get_descendants", "get_ancestors", "recent_changes"
+                    "get_descendants", "get_ancestors", "get_recent_changes"
                 }
                 
                 registered_tool_names = {tool.name for tool in tools}
@@ -311,7 +311,7 @@ class TestErrorHandling:
                 await session.initialize()
                 
                 # Call with invalid person handle
-                result = await session.call_tool("get_type", {
+                result = await session.call_tool("get_entity", {
                     "arguments": {
                         "type": "person",
                         "handle": "invalid_handle_123"

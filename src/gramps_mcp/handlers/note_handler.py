@@ -47,7 +47,10 @@ async def format_note(client, tree_id: str, handle: str) -> str:
         from ..models.api_calls import ApiCalls
 
         note_data = await client.make_api_call(
-            api_call=ApiCalls.GET_NOTE, tree_id=tree_id, handle=handle
+            api_call=ApiCalls.GET_NOTE,
+            tree_id=tree_id,
+            handle=handle,
+            params={"extend": "all"},
         )
         if not note_data:
             return ""
@@ -72,7 +75,28 @@ async def format_note(client, tree_id: str, handle: str) -> str:
         if len(text) > MAX_NOTE_LENGTH:
             text = text[: MAX_NOTE_LENGTH - 3] + "..."
 
-        return f"{note_type} Note - {gramps_id} - [{handle}]\n{text}\n\n"
+        result = f"{note_type} Note - {gramps_id} - [{handle}]\n"
+
+        # Tags
+        tag_list = note_data.get("tag_list", [])
+        if tag_list:
+            extended = note_data.get("extended", {})
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"Tags: {', '.join(tag_strs)}\n"
+
+        result += f"{text}\n\n"
+        return result
 
     except Exception as e:
         logger.debug(f"Failed to format note {handle}: {e}")

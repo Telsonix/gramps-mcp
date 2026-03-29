@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from mcp.types import TextContent
 
 from src.gramps_mcp.tools.search_basic import find_type_tool
-from src.gramps_mcp.tools.search_details import get_type_tool
+from src.gramps_mcp.tools.search_details import get_entity_tool
 
 # Load environment variables
 load_dotenv()
@@ -28,7 +28,7 @@ def extract_gramps_id_from_search(search_text: str):
 
 @pytest.mark.asyncio
 async def test_get_person_tool():
-    """Test get_type_tool provides comprehensive person data with timeline."""
+    """Test get_entity_tool provides comprehensive person data with timeline."""
     
     # Use specific person I0001 - first find the handle
     search_result = await find_type_tool({
@@ -48,7 +48,7 @@ async def test_get_person_tool():
                 handle = line[start+1:end]
                 
                 # Get comprehensive details report for person I0001
-                result = await get_type_tool({
+                result = await get_entity_tool({
                     "type": "person",
                     "handle": handle,
                 })
@@ -97,10 +97,10 @@ async def test_get_person_tool():
 
 @pytest.mark.asyncio
 async def test_get_person_by_gramps_id():
-    """Test get_type_tool with gramps_id parameter (no handle)."""
+    """Test get_entity_tool with gramps_id parameter (no handle)."""
     
     # Test getting person details using gramps_id directly
-    result = await get_type_tool({
+    result = await get_entity_tool({
         "type": "person", 
         "gramps_id": "I0001"
     })
@@ -118,7 +118,7 @@ async def test_get_person_by_gramps_id():
 
 @pytest.mark.asyncio
 async def test_get_family_tool():
-    """Test get_type_tool provides comprehensive family data with timeline."""
+    """Test get_entity_tool provides comprehensive family data with timeline."""
     
     # Use specific family F0001 - first find the handle
     search_result = await find_type_tool({
@@ -138,7 +138,7 @@ async def test_get_family_tool():
                 handle = line[start+1:end]
                 
                 # Get comprehensive family group report for F0001
-                result = await get_type_tool({
+                result = await get_entity_tool({
                     "type": "family",
                     "handle": handle,
                 })

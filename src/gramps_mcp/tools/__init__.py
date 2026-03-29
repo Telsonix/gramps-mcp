@@ -18,8 +18,8 @@
 Unified interface for all MCP tools.
 
 This module exports all 39 genealogy tools organized by category:
-- Search & Discovery Tools (3)
-- Data Management Tools (9 create + 10 delete + 4 tag/media + 2 upload = 25)
+- Search & Discovery Tools (3): find_type, find_anything, get_type
+- Data Management Tools (25): 9 create + 10 delete + 4 tag/media + 2 upload
 - Analysis Tools (11)
 """
 
@@ -27,16 +27,31 @@ This module exports all 39 genealogy tools organized by category:
 from .analysis import (
     get_ancestors_tool,
     get_descendants_tool,
+    get_dna_matches_tool,
     get_event_span_tool,
     get_facts_tool,
     get_families_timeline_tool,
+    get_holiday_on_date_tool,
+    get_holidays_tool,
+    get_living_dates_tool,
     get_living_tool,
     get_people_timeline_tool,
     get_recent_changes_tool,
     get_relations_all_tool,
     get_relations_tool,
+    get_report_file_tool,
+    get_report_processed_tool,
+    get_report_tool,
+    get_task_status_tool,
     get_tree_info_tool,
+    get_tree_tool,
+    get_trees_tool,
+    get_types_default_datatype_tool,
+    get_types_default_map_tool,
     get_types_tool,
+    list_reports_tool,
+    match_dna_parser_tool,
+    submit_report_file_tool,
 )
 
 # Data Management Tools (25 tools)
@@ -68,30 +83,16 @@ from .data_management import (
 )
 from .search_basic import (
     find_anything_tool,
-    find_citation_tool,
-    find_event_tool,
-    find_family_tool,
-    find_media_tool,
-    find_person_tool,
-    find_place_tool,
-    find_repository_tool,
-    find_source_tool,
+    find_type_tool,
 )
-from .search_details import get_type_tool
+from .search_details import get_entity_tool
 
 # Export all tools for easy import
 __all__ = [
-    # Search & Discovery Tools
-    "find_person_tool",
-    "find_family_tool",
-    "find_event_tool",
-    "find_place_tool",
-    "find_source_tool",
-    "find_repository_tool",
-    "find_citation_tool",
-    "find_media_tool",
+    # Search & Discovery Tools (3)
+    "find_type_tool",
     "find_anything_tool",
-    "get_type_tool",
+    "get_entity_tool",
     # Data Management Tools - Create
     "create_person_tool",
     "create_family_tool",
@@ -119,7 +120,7 @@ __all__ = [
     "get_media_file_tool",
     "upload_media_file_tool",
     "update_media_file_tool",
-    # Analysis Tools
+    # Analysis Tools (24 tools now)
     "get_tree_info_tool",
     "get_descendants_tool",
     "get_ancestors_tool",
@@ -127,9 +128,24 @@ __all__ = [
     "get_relations_tool",
     "get_relations_all_tool",
     "get_living_tool",
+    "get_living_dates_tool",
     "get_facts_tool",
     "get_people_timeline_tool",
     "get_families_timeline_tool",
     "get_event_span_tool",
     "get_types_tool",
+    "get_dna_matches_tool",
+    "match_dna_parser_tool",
+    "list_reports_tool",
+    "get_report_tool",
+    "get_report_file_tool",
+    "submit_report_file_tool",
+    "get_report_processed_tool",
+    "get_task_status_tool",
+    "get_holidays_tool",
+    "get_holiday_on_date_tool",
+    "get_trees_tool",
+    "get_tree_tool",
+    "get_types_default_datatype_tool",
+    "get_types_default_map_tool",
 ]

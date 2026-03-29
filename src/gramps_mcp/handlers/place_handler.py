@@ -45,7 +45,10 @@ async def format_place(client, tree_id: str, handle: str, inline: bool = False) 
 
     try:
         place_data = await client.make_api_call(
-            api_call=ApiCalls.GET_PLACE, tree_id=tree_id, handle=handle
+            api_call=ApiCalls.GET_PLACE,
+            tree_id=tree_id,
+            handle=handle,
+            params={} if inline else {"extend": "all"},
         )
         if not place_data:
             return "" if inline else f"• **Place {handle}**\n  Place not found\n\n"
@@ -67,7 +70,120 @@ async def format_place(client, tree_id: str, handle: str, inline: bool = False) 
         first_line = f"{place_type}: {title} - {gramps_id} - [{handle}]"
         result = first_line
 
-        # Second line: url path - url desc (if URLs present)
+        # Alternate names
+        alt_names = place_data.get("alt_names", [])
+        if alt_names:
+            alt_name_values = []
+            for alt in alt_names:
+                if isinstance(alt, dict):
+                    val = alt.get("value", "")
+                    lang = alt.get("lang", "")
+                    if val:
+                        alt_name_values.append(f"{val} ({lang})" if lang else val)
+            if alt_name_values:
+                result += f"\nAlt names: {', '.join(alt_name_values)}"
+
+        # Place code
+        code = place_data.get("code", "").strip()
+        if code:
+            result += f"\nCode: {code}"
+
+        # Geographic coordinates
+        lat = place_data.get("lat", "").strip()
+        lon = place_data.get("long", "").strip()
+        if lat and lon:
+            result += f"\nCoordinates: {lat}, {lon}"
+        elif lat:
+            result += f"\nLat: {lat}"
+        elif lon:
+            result += f"\nLon: {lon}"
+
+        # Tags
+        tag_list = place_data.get("tag_list", [])
+        if tag_list:
+            extended = place_data.get("extended", {})
+            ext_tags = extended.get("tags", [])
+            tag_map = {
+                t.get("handle", ""): t.get("name", "")
+                for t in ext_tags
+                if t.get("handle")
+            }
+            tag_strs = []
+            for h in tag_list:
+                tag_name = tag_map.get(h, "")
+                tag_str = (tag_name if tag_name else h) + f" [{h}]"
+                tag_strs.append(tag_str)
+            if tag_strs:
+                result += f"\nTags: {', '.join(tag_strs)}"
+
+        # Attached citations
+        citation_list = place_data.get("citation_list", [])
+        if citation_list:
+            citation_ids = []
+            for citation_handle in citation_list:
+                try:
+                    citation_data = await client.make_api_call(
+                        api_call=ApiCalls.GET_CITATION,
+                        tree_id=tree_id,
+                        handle=citation_handle,
+                    )
+                    if citation_data:
+                        citation_gramps_id = citation_data.get("gramps_id", "")
+                        if citation_gramps_id:
+                            citation_ids.append(
+                                f"{citation_gramps_id} [{citation_handle}]"
+                            )
+                except Exception:
+                    continue
+            if citation_ids:
+                result += f"\nAttached citations: {', '.join(citation_ids)}"
+
+        # Attached media
+        media_list = place_data.get("media_list", [])
+        if media_list:
+            media_ids = []
+            for media_ref in media_list:
+                if isinstance(media_ref, dict):
+                    media_handle = media_ref.get("ref", "")
+                    if media_handle:
+                        try:
+                            media_data = await client.make_api_call(
+                                api_call=ApiCalls.GET_MEDIA_ITEM,
+                                tree_id=tree_id,
+                                handle=media_handle,
+                            )
+                            if media_data:
+                                media_gramps_id = media_data.get("gramps_id", "")
+                                if media_gramps_id:
+                                    media_ids.append(
+                                        f"{media_gramps_id} [{media_handle}]"
+                                    )
+                        except Exception:
+                            continue
+            if media_ids:
+                result += f"\nAttached media: {', '.join(media_ids)}"
+
+        # Attached notes
+        note_list = place_data.get("note_list", [])
+        if note_list:
+            note_ids = []
+            for note_handle in note_list:
+                try:
+                    note_data = await client.make_api_call(
+                        api_call=ApiCalls.GET_NOTE,
+                        tree_id=tree_id,
+                        handle=note_handle,
+                    )
+                    if note_data:
+                        note_gramps_id = note_data.get("gramps_id", "")
+                        if note_gramps_id:
+                            note_ids.append(f"{note_gramps_id} [{note_handle}]")
+                except Exception:
+                    continue
+            if note_ids:
+                result += f"\nAttached notes: {', '.join(note_ids)}"
+
+        # URLs
         for url in urls:
             if isinstance(url, dict):
                 url_path = url.get("path", "")
