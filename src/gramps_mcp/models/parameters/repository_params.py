@@ -95,5 +95,20 @@ class RepositoryData(BaseDataModel):
         ..., description="Repository type (e.g., 'Archive', 'Library', 'Church', etc.)"
     )
     urls: Optional[List[Dict[str, Any]]] = Field(
-        None, description="List of URLs associated with the repository"
+        None,
+        description="List of URLs as dicts with 'path', 'type', 'desc'. Use 'path' for the URL value. Use get_types tool to see all valid URL types (listed under 'URL Types').",
     )
+
+    @field_validator("urls", mode="before")
+    @classmethod
+    def normalise_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """Normalise 'url' key to 'path' to match the Gramps API schema."""
+        if v is None or not isinstance(v, list):
+            return v
+        result = []
+        for item in v:
+            if isinstance(item, dict) and "url" in item and "path" not in item:
+                item = dict(item)
+                item["path"] = item.pop("url")
+            result.append(item)
+        return result

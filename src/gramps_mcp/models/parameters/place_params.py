@@ -77,7 +77,24 @@ class PlaceSaveParams(BaseModel):
     alt_names: Optional[List[str]] = Field(None, description="Alternative names")
     lat: Optional[str] = Field(None, description="Latitude coordinate")
     long: Optional[str] = Field(None, description="Longitude coordinate")
-    urls: Optional[List[dict]] = Field(None, description="Associated URLs")
+    urls: Optional[List[dict]] = Field(
+        None,
+        description="Associated URLs as dicts with 'path', 'type', 'desc'. Use 'path' for the URL value. Use get_types tool to see all valid URL types (listed under 'URL Types').",
+    )
+
+    @field_validator("urls", mode="before")
+    @classmethod
+    def normalise_urls(cls, v: Any) -> Optional[List[dict]]:
+        """Normalise 'url' key to 'path' to match the Gramps API schema."""
+        if v is None or not isinstance(v, list):
+            return v
+        result = []
+        for item in v:
+            if isinstance(item, dict) and "url" in item and "path" not in item:
+                item = dict(item)
+                item["path"] = item.pop("url")
+            result.append(item)
+        return result
     media_list: Optional[List[str]] = Field(None, description="List of media handles")
     citation_list: Optional[List[str]] = Field(
         None, description="List of citation handles"

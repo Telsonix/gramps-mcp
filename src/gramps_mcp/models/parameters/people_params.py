@@ -173,13 +173,18 @@ class PersonData(BaseDataModel):
     @field_validator("urls", mode="before")
     @classmethod
     def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate that urls items are dictionaries, not strings."""
+        """Validate and normalise url items.
+
+        Accepts dicts with 'path' or 'url' key (normalises 'url' → 'path').
+        Rejects plain strings with a helpful error message.
+        """
         if v is None:
             return v
         if not isinstance(v, list):
             raise ValueError(
                 f"urls must be a list of dictionaries, got {type(v).__name__}"
             )
+        normalised = []
         for i, item in enumerate(v):
             if isinstance(item, str):
                 raise ValueError(
@@ -191,7 +196,13 @@ class PersonData(BaseDataModel):
                 raise ValueError(
                     f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
                 )
-        return v
+            # Reason: agents commonly use 'url' instead of the API field name 'path'.
+            # Silently normalise so the value reaches the API correctly.
+            if "url" in item and "path" not in item:
+                item = dict(item)
+                item["path"] = item.pop("url")
+            normalised.append(item)
+        return normalised
 
     @field_validator("alternate_names", mode="before")
     @classmethod
@@ -269,10 +280,12 @@ class PersonData(BaseDataModel):
         None,
         description=(
             "List of URLs as dictionaries. Each URL should have optional keys: "
-            "'path' (the URL itself), 'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
-            "Example: [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}, "
-            "{'path': 'https://findagrave.com/memorial/123', 'type': 'Web Home', 'desc': 'Find A Grave'}]. "
-            "Note: All keys are optional, but at least 'path' is recommended. Must be list of {dict}, not strings."
+            "'path' (the URL string — use 'path', NOT 'url'), "
+            "'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
+            "Example: [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}]. "
+            "Note: use 'path' for the URL value — 'url' is also accepted and auto-normalised. "
+            "Must be a list of dicts, not strings. "
+            "Use get_types tool to see all valid URL types (listed under 'URL Types')."
         ),
     )
 
