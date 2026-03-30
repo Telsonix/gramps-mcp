@@ -50,6 +50,14 @@ class FamilySaveParams(BaseModel):
     )
     father_handle: Optional[str] = Field(None, description="Father's handle")
     mother_handle: Optional[str] = Field(None, description="Mother's handle")
+    relationship_type: Optional[str] = Field(
+        None,
+        description=(
+            "Type of relationship between father and mother. "
+            "Examples: 'Marriage', 'Partnership', 'Unmarried', 'Unknown'. "
+            "Use get_types tool to see all valid relationship types (listed under 'Family Relationship Types')."
+        ),
+    )
     child_handles: Optional[List[str]] = Field(
         None,
         description="List of child handles (convenience field, converted to child_ref_list)",
@@ -226,6 +234,8 @@ class FamilySaveParams(BaseModel):
             data["father_handle"] = self.father_handle
         if self.mother_handle is not None:
             data["mother_handle"] = self.mother_handle
+        if self.relationship_type is not None:
+            data["relationship_type"] = self.relationship_type
         if self.event_ref_list is not None:
             data["event_ref_list"] = self.event_ref_list
         if self.note_list is not None:
