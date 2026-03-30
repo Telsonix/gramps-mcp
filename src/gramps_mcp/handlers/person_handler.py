@@ -92,7 +92,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         result += f"Died: {death_date} - {death_place}\n"
 
     # Relations section
-    result += "\nRELATIONS:\n"
+    result += "\Relations:\n"
 
     # Parents section
     result += "Parents:\n"
@@ -226,7 +226,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
             continue
 
     # Timeline section
-    result += "\nTIMELINE:\n"
+    result += "\Timeline:\n"
     if timeline_data:
         for timeline_event in timeline_data:
             if not isinstance(timeline_event, dict):
@@ -337,7 +337,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
             if attr_type and attr_value:
                 attr_strs.append(f"{attr_type}: {attr_value}")
         if attr_strs:
-            result += f"Attributes: {'; '.join(attr_strs)}\n"
+            result += f"\nAttributes: {'; '.join(attr_strs)}\n"
 
     # Associations (godparent, friend, etc.)
     person_ref_list = person_data.get("person_ref_list", [])
@@ -368,12 +368,12 @@ async def format_person(client, tree_id: str, handle: str) -> str:
             else:
                 assoc_strs.append(f"{ref_id} [{ref_handle}]" if ref_id else f"[{ref_handle}]")
         if assoc_strs:
-            result += f"Associations: {', '.join(assoc_strs)}\n"
+            result += f"\nAssociations: {', '.join(assoc_strs)}\n"
 
     # Addresses
     address_list = person_data.get("address_list", [])
     if address_list:
-        result += "Addresses:\n"
+        result += "\nAddresses:\n"
         for addr in address_list:
             addr_date = format_date(addr.get("date", {}))
             parts = [
@@ -405,7 +405,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
                 cit_id = cit_map[h].get("gramps_id", h)
                 cit_strs.append(f"{cit_id} [{h}]")
         if cit_strs:
-            result += f"Citations: {', '.join(cit_strs)}\n"
+            result += f"\nCitations: {', '.join(cit_strs)}\n"
 
     # LDS Ordinations
     lds_ord_list = person_data.get("lds_ord_list", [])
@@ -420,7 +420,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
             8: "Pre-1970", 9: "Qualified", 10: "DNS/CAN",
             11: "Stillborn", 12: "Submitted", 13: "Uncleared",
         }
-        result += "LDS Ordinations:\n"
+        result += "\nLDS Ordinations:\n"
         for lds in lds_ord_list:
             lds_type = lds_type_map.get(lds.get("type"), str(lds.get("type", "")))
             lds_date = format_date(lds.get("date", {}))
@@ -438,6 +438,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
     # URLs
     urls = person_data.get("urls", [])
     if urls:
+        result += "\nURLs:\n"
         for url in urls:
             if isinstance(url, dict):
                 url_path = url.get("path", "")
