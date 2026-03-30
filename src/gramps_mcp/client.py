@@ -190,6 +190,94 @@ class GrampsWebAPIClient:
 
         return self._build_url(tree_id, substituted_endpoint)
 
+    @staticmethod
+    def _merge_list_field(existing_items: list, new_items: list) -> list:
+        """
+        Merge two lists using an appropriate strategy based on item type.
+
+        Args:
+            existing_items (list): Items currently stored in the API.
+            new_items (list): Items provided by the caller.
+
+        Returns:
+            list: Merged list.
+        """
+        sample = next(
+            (x for x in (existing_items + new_items) if x is not None), None
+        )
+        if isinstance(sample, dict) and "ref" in sample:
+            # Reference-object list: append new refs, skip duplicates
+            existing_refs = {
+                item.get("ref") for item in existing_items if isinstance(item, dict)
+            }
+            return existing_items + [
+                item
+                for item in new_items
+                if isinstance(item, dict) and item.get("ref") not in existing_refs
+            ]
+        elif isinstance(sample, str):
+            # String handle list: append new handles, skip duplicates
+            existing_set = set(existing_items)
+            return existing_items + [
+                item for item in new_items if item not in existing_set
+            ]
+        elif isinstance(sample, dict) and "surname" in sample:
+            # Reason: surname_list items have no 'ref' but 'surname' is their stable
+            # identity key. Append new surnames while preserving existing ones so that
+            # a simplified name string (auto-converted to one surname) never silently
+            # drops a second surname stored in the record.
+            existing_surnames = {
+                item.get("surname")
+                for item in existing_items
+                if isinstance(item, dict)
+            }
+            return existing_items + [
+                item
+                for item in new_items
+                if isinstance(item, dict)
+                and item.get("surname") not in existing_surnames
+            ]
+        else:
+            # Inline-data list (attribute_list, address_list, etc.): replace entirely.
+            # The caller provides the complete desired state for these lists.
+            return new_items
+
+    @staticmethod
+    def _deep_merge_objects(existing_obj: dict, new_obj: dict) -> dict:
+        """
+        Recursively merge new_obj into existing_obj.
+
+        Preserves fields in existing_obj not present in new_obj and applies
+        list-merge logic to nested _list fields (e.g. surname_list inside
+        primary_name).
+
+        Args:
+            existing_obj (dict): Object currently stored in the API.
+            new_obj (dict): Partial object provided by the caller.
+
+        Returns:
+            dict: Deeply merged object.
+        """
+        result = existing_obj.copy()
+        for key, value in new_obj.items():
+            if key not in existing_obj:
+                result[key] = value
+            elif (
+                key.endswith("_list")
+                and isinstance(value, list)
+                and isinstance(existing_obj[key], list)
+            ):
+                result[key] = GrampsWebAPIClient._merge_list_field(
+                    existing_obj[key], value
+                )
+            elif isinstance(value, dict) and isinstance(existing_obj[key], dict):
+                result[key] = GrampsWebAPIClient._deep_merge_objects(
+                    existing_obj[key], value
+                )
+            else:
+                result[key] = value
+        return result
+
     async def make_api_call(
         self,
         api_call: ApiCalls,
@@ -275,55 +363,32 @@ class GrampsWebAPIClient:
                     # Merge existing data with changes
                     merged_data = existing.copy()
 
-                    # Merge all fields properly:
-                    # - ref-object lists (event_ref_list, media_list): append with
-                    #   dedup by 'ref' so adding a single ref works without resending all
-                    # - string handle lists (family_list, etc.): append with dedup
-                    # - inline-data lists (attribute_list, address_list, etc.): replace
-                    #   entirely, because the caller is providing the complete desired state
+                    # Merge all fields using type-aware helpers:
+                    # - _list fields: delegated to _merge_list_field (ref-append,
+                    #   string-append, surname-append, or inline-replace)
+                    # - dict fields: delegated to _deep_merge_objects so nested
+                    #   sub-fields (e.g. surname_list inside primary_name) are
+                    #   preserved even when the caller sends a simplified value
                     for key, value in json_data.items():
                         if (
                             key.endswith("_list")
                             and isinstance(value, list)
                             and key in existing
                         ):
-                            existing_items = existing.get(key, [])
-
-                            # Determine list item type from first available sample
-                            sample = next(
-                                (x for x in (existing_items + value) if x is not None),
-                                None,
+                            merged_data[key] = GrampsWebAPIClient._merge_list_field(
+                                existing.get(key, []), value
                             )
-
-                            if isinstance(sample, dict) and "ref" in sample:
-                                # Reference-object list: append new refs, skip duplicates
-                                existing_refs = {
-                                    item.get("ref")
-                                    for item in existing_items
-                                    if isinstance(item, dict)
-                                }
-                                new_items = [
-                                    item
-                                    for item in value
-                                    if isinstance(item, dict)
-                                    and item.get("ref") not in existing_refs
-                                ]
-                                merged_data[key] = existing_items + new_items
-                            elif isinstance(sample, str):
-                                # String handle list: append new handles, skip duplicates
-                                existing_set = set(existing_items)
-                                new_items = [
-                                    item
-                                    for item in value
-                                    if item not in existing_set
-                                ]
-                                merged_data[key] = existing_items + new_items
-                            else:
-                                # Reason: inline-data lists (attribute_list, address_list,
-                                # lds_ord_list, etc.) do not reference other objects — the
-                                # caller always sends the complete desired list, so replace
-                                # rather than append to avoid duplicates on update.
-                                merged_data[key] = value
+                        elif (
+                            isinstance(value, dict)
+                            and isinstance(existing.get(key), dict)
+                        ):
+                            # Reason: deep-merge dict fields so a partial update
+                            # (e.g. primary_name from a plain string that produces
+                            # only one surname) never silently wipes nested data
+                            # the caller did not intend to change.
+                            merged_data[key] = GrampsWebAPIClient._deep_merge_objects(
+                                existing[key], value
+                            )
                         else:
                             merged_data[key] = value
                     json_data = merged_data
