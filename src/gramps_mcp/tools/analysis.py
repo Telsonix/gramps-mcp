@@ -411,28 +411,46 @@ def _format_tree_info(tree_info: Dict) -> str:
     tree_id = tree_info.get("id", "N/A")
     name = tree_info.get("name", "Unnamed Tree")
     description = tree_info.get("description", "")
+    enabled = tree_info.get("enabled")
 
     result = f"# Family Tree: {name}\n\n"
     result += f"**Tree ID:** `{tree_id}`\n"
     if description:
         result += f"**Description:** {description}\n"
+    if enabled is not None:
+        result += f"**Enabled:** {'Yes' if enabled else 'No'}\n"
     result += "\n"
 
-    # Statistics from usage fields
+    # Usage statistics (present even when zero for an empty tree)
     usage_people = tree_info.get("usage_people")
     usage_media = tree_info.get("usage_media")
 
-    result += "## Statistics\n\n"
-
-    if usage_people is not None or usage_media is not None:
-        if usage_people is not None:
-            result += f"• **People:** {usage_people:,}\n"
-        if usage_media is not None:
-            usage_media_mb = usage_media / (1024 * 1024)
-            result += f"• **Media Storage:** {usage_media_mb:.2f} MB\n"
-        result += "\n"
+    result += "## Usage\n\n"
+    # Reason: treat 0 as a valid value — an empty tree has 0 people, not "unavailable"
+    result += f"• **People:** {usage_people:,}\n" if usage_people is not None else "• **People:** 0\n"
+    if usage_media is not None:
+        usage_media_mb = usage_media / (1024 * 1024)
+        result += f"• **Media Storage:** {usage_media_mb:.2f} MB ({usage_media:,} bytes)\n"
     else:
-        result += "Statistics not available\n\n"
+        result += "• **Media Storage:** 0 MB\n"
+    result += "\n"
+
+    # Quota limits (optional — only shown when the server has set them)
+    quota_people = tree_info.get("quota_people")
+    quota_media = tree_info.get("quota_media")
+    if quota_people is not None or quota_media is not None:
+        result += "## Limits\n\n"
+        if quota_people is not None:
+            result += f"• **Max People:** {quota_people:,}\n"
+        if quota_media is not None:
+            quota_media_mb = quota_media / (1024 * 1024)
+            result += f"• **Max Media Storage:** {quota_media_mb:.2f} MB\n"
+        result += "\n"
+
+    # AI access setting
+    min_role_ai = tree_info.get("min_role_ai")
+    if min_role_ai is not None:
+        result += f"**Min Role for AI Chat:** {min_role_ai}\n"
 
     return result
 
