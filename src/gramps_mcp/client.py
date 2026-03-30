@@ -275,8 +275,12 @@ class GrampsWebAPIClient:
                     # Merge existing data with changes
                     merged_data = existing.copy()
 
-                    # Merge all fields properly - lists get concatenated,
-                    # others get replaced
+                    # Merge all fields properly:
+                    # - ref-object lists (event_ref_list, media_list): append with
+                    #   dedup by 'ref' so adding a single ref works without resending all
+                    # - string handle lists (family_list, etc.): append with dedup
+                    # - inline-data lists (attribute_list, address_list, etc.): replace
+                    #   entirely, because the caller is providing the complete desired state
                     for key, value in json_data.items():
                         if (
                             key.endswith("_list")
@@ -285,52 +289,41 @@ class GrampsWebAPIClient:
                         ):
                             existing_items = existing.get(key, [])
 
-                            # Smart deduplication based on list content type
-                            if existing_items and value:
-                                # Check if items are objects with 'ref' field
-                                # (like event_ref_list, media_list)
-                                sample_existing = (
-                                    existing_items[0] if existing_items else None
-                                )
-                                sample_new = value[0] if value else None
+                            # Determine list item type from first available sample
+                            sample = next(
+                                (x for x in (existing_items + value) if x is not None),
+                                None,
+                            )
 
-                                if (
-                                    isinstance(sample_existing, dict)
-                                    and "ref" in sample_existing
-                                    and isinstance(sample_new, dict)
-                                    and "ref" in sample_new
-                                ):
-                                    # Deduplicate reference objects based on 'ref' field
-                                    existing_refs = {
-                                        item.get("ref")
-                                        for item in existing_items
-                                        if isinstance(item, dict)
-                                    }
-                                    new_items = [
-                                        item
-                                        for item in value
-                                        if isinstance(item, dict)
-                                        and item.get("ref") not in existing_refs
-                                    ]
-                                    merged_data[key] = existing_items + new_items
-                                elif isinstance(sample_existing, str) and isinstance(
-                                    sample_new, str
-                                ):
-                                    # Deduplicate simple string handles
-                                    existing_set = set(existing_items)
-                                    new_items = [
-                                        item
-                                        for item in value
-                                        if item not in existing_set
-                                    ]
-                                    merged_data[key] = existing_items + new_items
-                                else:
-                                    # Fallback: simple concatenation for
-                                    # mixed/unknown types
-                                    merged_data[key] = existing_items + value
+                            if isinstance(sample, dict) and "ref" in sample:
+                                # Reference-object list: append new refs, skip duplicates
+                                existing_refs = {
+                                    item.get("ref")
+                                    for item in existing_items
+                                    if isinstance(item, dict)
+                                }
+                                new_items = [
+                                    item
+                                    for item in value
+                                    if isinstance(item, dict)
+                                    and item.get("ref") not in existing_refs
+                                ]
+                                merged_data[key] = existing_items + new_items
+                            elif isinstance(sample, str):
+                                # String handle list: append new handles, skip duplicates
+                                existing_set = set(existing_items)
+                                new_items = [
+                                    item
+                                    for item in value
+                                    if item not in existing_set
+                                ]
+                                merged_data[key] = existing_items + new_items
                             else:
-                                # If either list is empty, just concatenate
-                                merged_data[key] = existing_items + value
+                                # Reason: inline-data lists (attribute_list, address_list,
+                                # lds_ord_list, etc.) do not reference other objects — the
+                                # caller always sends the complete desired list, so replace
+                                # rather than append to avoid duplicates on update.
+                                merged_data[key] = value
                         else:
                             merged_data[key] = value
                     json_data = merged_data

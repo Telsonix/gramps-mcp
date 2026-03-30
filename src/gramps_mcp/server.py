@@ -953,7 +953,7 @@ def register_tools():
             annotations[field_name] = field_info.annotation
 
         async def create_handler(
-            *args, handler=handler_func, model=schema, **kwargs
+            *args, handler=handler_func, model=schema, tool_name=tool_name, **kwargs
         ):
             # Log raw parameters received from FastMCP
             logger.info(f"[TOOL INVOKED] {tool_name} | Raw kwargs: {kwargs}")
