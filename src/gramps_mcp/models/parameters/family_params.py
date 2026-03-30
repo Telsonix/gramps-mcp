@@ -76,7 +76,8 @@ class FamilySaveParams(BaseModel):
         None,
         description=(
             "List of URLs as dictionaries with optional keys 'path', 'type', 'desc', 'private'. "
-            "Example: [{'path': 'https://example.com', 'type': 'Web Home'}]"
+            "Example: [{'path': 'https://example.com', 'type': 'Web Home'}]. "
+            "Use get_types tool to see all valid URL types (listed under 'URL Types')."
         ),
     )
     media_list: Optional[List[dict]] = Field(
@@ -146,11 +147,15 @@ class FamilySaveParams(BaseModel):
     @field_validator("urls", mode="before")
     @classmethod
     def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate that urls items are dictionaries, not strings."""
+        """Validate and normalise url items.
+
+        Accepts dicts with 'path' or 'url' key (normalises 'url' → 'path').
+        """
         if v is None:
             return v
         if not isinstance(v, list):
             raise ValueError(f"urls must be a list of dictionaries, got {type(v).__name__}")
+        normalised = []
         for i, item in enumerate(v):
             if isinstance(item, str):
                 raise ValueError(
@@ -161,7 +166,11 @@ class FamilySaveParams(BaseModel):
                 raise ValueError(
                     f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
                 )
-        return v
+            if "url" in item and "path" not in item:
+                item = dict(item)
+                item["path"] = item.pop("url")
+            normalised.append(item)
+        return normalised
 
     @field_validator("media_list", mode="before")
     @classmethod

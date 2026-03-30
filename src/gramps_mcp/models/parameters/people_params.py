@@ -27,6 +27,8 @@ API calls supported in this category:
 - GET_PERSON_DNA_MATCHES: Get DNA matches for a specific person
 """
 
+import json
+import re
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
@@ -44,33 +46,80 @@ _GENDER_MAP = {
 }
 
 
-def _build_name_object(value: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def _build_name_object(
+    value: Union[str, Dict[str, Any]], default_type: str = "Birth Name"
+) -> Dict[str, Any]:
     """
     Convert a plain name string into a Gramps Name object dict.
 
-    Splits on whitespace: last token becomes the surname, everything before
-    it becomes first_name.  If only one token is given it is used as surname.
+    Supported string formats:
+    - "John Smith"           → first_name="John", surname="Smith"
+    - "John Smith | Jones"   → first_name="John", surnames=["Smith", "Jones"]
+    - "John (Married Name)" → first_name="", surname="John", type="Married Name"
+    - "John Smith (Married Name)" → first_name="John", surname="Smith", type="Married Name"
+
+    Dict input is returned as-is, with optional normalization of
+    surname_list items that are plain strings instead of dicts.
 
     Args:
-        value: Either a full name string (e.g. "John Smith") or an already
-               constructed name dict.
+        value: A plain name string or an already-constructed name dict.
+        default_type: Name type to use when none is specified in the string.
 
     Returns:
         Dict[str, Any]: A Gramps-compatible Name object.
     """
     if isinstance(value, dict):
+        # Normalize surname_list entries that are plain strings
+        if "surname_list" in value and isinstance(value["surname_list"], list):
+            normalized = []
+            for i, s in enumerate(value["surname_list"]):
+                if isinstance(s, str):
+                    normalized.append({"surname": s, "primary": i == 0})
+                else:
+                    normalized.append(s)
+            value = dict(value)
+            value["surname_list"] = normalized
         return value
-    parts = value.strip().split()
-    if len(parts) > 1:
-        first_name = " ".join(parts[:-1])
-        surname = parts[-1]
+
+    text = value.strip()
+
+    # Detect optional "(Name Type)" suffix
+    name_type = default_type
+    m = re.match(r'^(.+?)\s*\(([^)]+)\)\s*$', text)
+    if m:
+        text, name_type = m.group(1).strip(), m.group(2).strip()
+
+    # Reason: pipe separator lets agents explicitly list multiple surnames,
+    # e.g. "Sergey | Andreev | fon Venberg" → first="Sergey",
+    # surnames=["Andreev" (primary), "fon Venberg"]
+    if "|" in text:
+        segments = [s.strip() for s in text.split("|")]
+        # First segment: split into given name + first surname
+        first_parts = segments[0].split()
+        if len(first_parts) > 1:
+            first_name = " ".join(first_parts[:-1])
+            first_surname = first_parts[-1]
+        else:
+            first_name = ""
+            first_surname = first_parts[0] if first_parts else ""
+        surname_list = [{"surname": first_surname, "primary": True}]
+        for extra in segments[1:]:
+            if extra:
+                surname_list.append({"surname": extra, "primary": False})
     else:
-        first_name = ""
-        surname = parts[0] if parts else ""
+        parts = text.split()
+        if len(parts) > 1:
+            first_name = " ".join(parts[:-1])
+            surname = parts[-1]
+        else:
+            first_name = ""
+            surname = parts[0] if parts else ""
+        surname_list = [{"surname": surname, "primary": True}]
+
     return {
         "first_name": first_name,
-        "surname_list": [{"surname": surname, "primary": True}],
-        "type": "Birth Name",
+        "surname_list": surname_list,
+        "type": name_type,
     }
 
 
@@ -124,13 +173,18 @@ class PersonData(BaseDataModel):
     @field_validator("urls", mode="before")
     @classmethod
     def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate that urls items are dictionaries, not strings."""
+        """Validate and normalise url items.
+
+        Accepts dicts with 'path' or 'url' key (normalises 'url' → 'path').
+        Rejects plain strings with a helpful error message.
+        """
         if v is None:
             return v
         if not isinstance(v, list):
             raise ValueError(
                 f"urls must be a list of dictionaries, got {type(v).__name__}"
             )
+        normalised = []
         for i, item in enumerate(v):
             if isinstance(item, str):
                 raise ValueError(
@@ -142,14 +196,75 @@ class PersonData(BaseDataModel):
                 raise ValueError(
                     f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
                 )
-        return v
+            # Reason: agents commonly use 'url' instead of the API field name 'path'.
+            # Silently normalise so the value reaches the API correctly.
+            if "url" in item and "path" not in item:
+                item = dict(item)
+                item["path"] = item.pop("url")
+            normalised.append(item)
+        return normalised
+
+    @field_validator("alternate_names", mode="before")
+    @classmethod
+    def coerce_alternate_names(
+        cls, v: Any
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Accept alternate_names in flexible formats so agents don't need to
+        construct full Gramps Name objects manually.
+
+        Accepted inputs:
+        - None                    → None
+        - list of dicts           → used as-is
+        - list of strings         → each converted via _build_name_object
+        - JSON string             → parsed, then processed as list
+        - plain string            → split on top-level commas (outside
+          parentheses) and each part converted via _build_name_object
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first (e.g. agent may send '["name1", "name2"]')
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # Reason: split on ", " only at positions that are NOT inside
+                # parentheses, so "John Smith (Married Name), Jane (Birth Name)"
+                # produces two entries rather than three.
+                parts = re.split(r",\s*(?=[^)]*(?:\(|$))", v)
+                v = [p.strip() for p in parts if p.strip()]
+
+        if isinstance(v, list):
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    result.append(
+                        _build_name_object(item, default_type="Also Known As")
+                    )
+                elif isinstance(item, dict):
+                    result.append(_build_name_object(item))
+                else:
+                    raise ValueError(
+                        f"alternate_names items must be strings or dicts, "
+                        f"got {type(item).__name__}"
+                    )
+            return result
+
+        raise ValueError(
+            f"alternate_names must be a list or string, got {type(v).__name__}"
+        )
 
     alternate_names: Optional[List[Dict[str, Any]]] = Field(
         None,
         description=(
-            "List of alternate names (married names, maiden names, etc). "
-            "Each name should have the same structure as primary_name with "
-            "first_name, surname_list, and type (e.g., 'Married Name', 'Birth Name')"
+            "List of alternate names (married names, maiden names, also-known-as). "
+            "Accepts a list of name objects OR a list of plain strings "
+            "(e.g. ['Jane Smith', 'Jane Doe (Married Name)']). "
+            "Each string may include an optional '(Name Type)' suffix to set the name type. "
+            "Multiple surnames within one name: use '|' separator "
+            "(e.g. 'Sergey | Andreev | fon Venberg'). "
+            "Use the get_types tool to look up all valid name types (listed under 'Name Types')."
         ),
     )
     event_ref_list: Optional[List[EventReference]] = Field(
@@ -165,10 +280,12 @@ class PersonData(BaseDataModel):
         None,
         description=(
             "List of URLs as dictionaries. Each URL should have optional keys: "
-            "'path' (the URL itself), 'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
-            "Example: [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}, "
-            "{'path': 'https://findagrave.com/memorial/123', 'type': 'Web Home', 'desc': 'Find A Grave'}]. "
-            "Note: All keys are optional, but at least 'path' is recommended. Must be list of {dict}, not strings."
+            "'path' (the URL string — use 'path', NOT 'url'), "
+            "'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
+            "Example: [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}]. "
+            "Note: use 'path' for the URL value — 'url' is also accepted and auto-normalised. "
+            "Must be a list of dicts, not strings. "
+            "Use get_types tool to see all valid URL types (listed under 'URL Types')."
         ),
     )
 
