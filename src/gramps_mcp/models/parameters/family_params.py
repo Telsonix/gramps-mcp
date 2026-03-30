@@ -91,58 +91,64 @@ class FamilySaveParams(BaseModel):
     @field_validator("child_ref_list", mode="before")
     @classmethod
     def validate_child_ref_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate that child_ref_list items are dictionaries with 'ref' key."""
+        """Coerce and validate child_ref_list: convert strings to dicts with 'ref' key.
+        
+        Strings are treated as child handles: {"ref": value}
+        Dicts are validated to have 'ref' key.
+        """
         if v is None:
             return v
         if not isinstance(v, list):
             raise ValueError(
                 f"child_ref_list must be a list of dictionaries, got {type(v).__name__}"
             )
+        coerced = []
         for i, item in enumerate(v):
             if isinstance(item, str):
+                coerced.append({"ref": item})
+            elif isinstance(item, dict):
+                if "ref" not in item:
+                    raise ValueError(
+                        f"child_ref_list[{i}]: Missing required 'ref' key (child handle). "
+                        f"Correct format: {{'ref': 'child_handle'}}"
+                    )
+                coerced.append(item)
+            else:
                 raise ValueError(
-                    f"child_ref_list[{i}]: Child reference must be a dictionary with 'ref' key, "
-                    f"not a string. Got '{item}'. "
-                    f"Correct format: {{'ref': 'child_handle'}}"
+                    f"child_ref_list[{i}]: Each child reference must be a string (handle) or dictionary, got {type(item).__name__}"
                 )
-            if not isinstance(item, dict):
-                raise ValueError(
-                    f"child_ref_list[{i}]: Each child reference must be a dictionary, got {type(item).__name__}"
-                )
-            if "ref" not in item:
-                raise ValueError(
-                    f"child_ref_list[{i}]: Missing required 'ref' key (child handle). "
-                    f"Correct format: {{'ref': 'child_handle'}}"
-                )
-        return v
+        return coerced
 
     @field_validator("event_ref_list", mode="before")
     @classmethod
     def validate_event_ref_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate that event_ref_list items are dictionaries with 'ref' key."""
+        """Coerce and validate event_ref_list: convert strings to dicts with 'ref' key.
+        
+        Strings are treated as event handles: {"ref": value}
+        Dicts are validated to have 'ref' key.
+        """
         if v is None:
             return v
         if not isinstance(v, list):
             raise ValueError(
                 f"event_ref_list must be a list of dictionaries, got {type(v).__name__}"
             )
+        coerced = []
         for i, item in enumerate(v):
             if isinstance(item, str):
+                coerced.append({"ref": item})
+            elif isinstance(item, dict):
+                if "ref" not in item:
+                    raise ValueError(
+                        f"event_ref_list[{i}]: Missing required 'ref' key (event handle). "
+                        f"Correct format: {{'ref': 'event_handle'}}"
+                    )
+                coerced.append(item)
+            else:
                 raise ValueError(
-                    f"event_ref_list[{i}]: Event reference must be a dictionary with 'ref' key, "
-                    f"not a string. Got '{item}'. "
-                    f"Correct format: {{'ref': 'event_handle'}}"
+                    f"event_ref_list[{i}]: Each event reference must be a string (handle) or dictionary, got {type(item).__name__}"
                 )
-            if not isinstance(item, dict):
-                raise ValueError(
-                    f"event_ref_list[{i}]: Each event reference must be a dictionary, got {type(item).__name__}"
-                )
-            if "ref" not in item:
-                raise ValueError(
-                    f"event_ref_list[{i}]: Missing required 'ref' key (event handle). "
-                    f"Correct format: {{'ref': 'event_handle'}}"
-                )
-        return v
+        return coerced
 
     @field_validator("urls", mode="before")
     @classmethod
@@ -175,30 +181,33 @@ class FamilySaveParams(BaseModel):
     @field_validator("media_list", mode="before")
     @classmethod
     def validate_media_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate that media_list items are dictionaries with 'ref' key."""
+        """Coerce and validate media_list: convert strings to dicts with 'ref' key.
+        
+        Strings are treated as media handles: {"ref": value}
+        Dicts are validated to have 'ref' key.
+        """
         if v is None:
             return v
         if not isinstance(v, list):
             raise ValueError(
                 f"media_list must be a list of dictionaries, got {type(v).__name__}"
             )
+        coerced = []
         for i, item in enumerate(v):
             if isinstance(item, str):
+                coerced.append({"ref": item})
+            elif isinstance(item, dict):
+                if "ref" not in item:
+                    raise ValueError(
+                        f"media_list[{i}]: Missing required 'ref' key (media handle). "
+                        f"Correct format: {{'ref': 'media_handle'}}"
+                    )
+                coerced.append(item)
+            else:
                 raise ValueError(
-                    f"media_list[{i}]: Media reference must be a dictionary with 'ref' key, "
-                    f"not a string. Got '{item}'. "
-                    f"Correct format: {{'ref': 'media_handle'}}"
+                    f"media_list[{i}]: Each media reference must be a string (handle) or dictionary, got {type(item).__name__}"
                 )
-            if not isinstance(item, dict):
-                raise ValueError(
-                    f"media_list[{i}]: Each media reference must be a dictionary, got {type(item).__name__}"
-                )
-            if "ref" not in item:
-                raise ValueError(
-                    f"media_list[{i}]: Missing required 'ref' key (media handle). "
-                    f"Correct format: {{'ref': 'media_handle'}}"
-                )
-        return v
+        return coerced
 
     @model_serializer
     def serialize_model(self) -> Dict[str, Any]:
