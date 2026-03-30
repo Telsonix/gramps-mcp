@@ -92,7 +92,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         result += f"Died: {death_date} - {death_place}\n"
 
     # Relations section
-    result += "\Relations:\n"
+    result += "Relations:\n"
 
     # Parents section
     result += "Parents:\n"
@@ -226,7 +226,7 @@ async def format_person(client, tree_id: str, handle: str) -> str:
             continue
 
     # Timeline section
-    result += "\Timeline:\n"
+    result += "Timeline:\n"
     if timeline_data:
         for timeline_event in timeline_data:
             if not isinstance(timeline_event, dict):

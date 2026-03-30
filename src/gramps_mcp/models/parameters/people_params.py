@@ -267,8 +267,63 @@ class PersonData(BaseDataModel):
             "Use the get_types tool to look up all valid name types (listed under 'Name Types')."
         ),
     )
+
+    @field_validator("event_ref_list", mode="before")
+    @classmethod
+    def coerce_event_ref_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
+        """
+        Coerce event_ref_list to handle flexible input formats.
+
+        Accepted inputs:
+        - None                      → None
+        - list of strings (handles) → convert to [{ref: handle, role: 'Primary'}]
+        - list of dicts             → use as-is
+        - stringified list          → parse and convert
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # Single handle string
+                return [{"ref": v.strip(), "role": "Primary"}] if v.strip() else None
+
+        if isinstance(v, list):
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    # String handle → convert to dict with default role
+                    result.append({"ref": item, "role": "Primary"})
+                elif isinstance(item, dict):
+                    # Dict → ensure it has 'ref' and 'role'
+                    if "ref" not in item:
+                        raise ValueError(
+                            f"event_ref_list item missing required 'ref' key: {item}"
+                        )
+                    if "role" not in item:
+                        item = dict(item)
+                        item["role"] = "Primary"
+                    result.append(item)
+                else:
+                    raise ValueError(
+                        f"event_ref_list items must be strings or dicts, got {type(item).__name__}"
+                    )
+            return result if result else None
+
+        raise ValueError(
+            f"event_ref_list must be a list or string, got {type(v).__name__}"
+        )
+
     event_ref_list: Optional[List[EventReference]] = Field(
-        None, description="List of references to events the person participated in"
+        None,
+        description=(
+            "List of references to events the person participated in. "
+            "Can pass event handles as strings (e.g., ['event_handle_1', ...]) which will auto-convert with role='Primary', "
+            "or full dicts with 'ref' and 'role' keys (e.g., [{'ref': 'handle', 'role': 'Primary'}, ...])"
+        ),
     )
     family_list: Optional[List[str]] = Field(
         None, description="List of handles for families the person was a parent of"
