@@ -18,6 +18,7 @@
 Base parameter classes for common patterns across Gramps API operations.
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -238,6 +239,80 @@ class BaseDataModel(BaseModel):
                     f"Correct format: {{'ref': 'media_handle'}}"
                 )
         return v
+
+    @field_validator("tag_list", mode="before")
+    @classmethod
+    def coerce_tag_list(cls, v: Any) -> Optional[List[str]]:
+        """
+        Coerce tag_list to handle stringified list inputs.
+
+        Accepted inputs:
+        - None              → None
+        - list of strings   → used as-is
+        - stringified list  → parsed and converted to list
+        - single string     → wrapped in a list
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first (e.g. agent may send "['handle1', 'handle2']" or '["handle1", "handle2"]')
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # If not valid JSON, treat as a single tag handle
+                return [v.strip()] if v.strip() else None
+
+        if isinstance(v, list):
+            # Ensure all items are strings
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    result.append(item)
+                else:
+                    raise ValueError(
+                        f"tag_list items must be strings (tag handles), got {type(item).__name__}"
+                    )
+            return result if result else None
+
+        raise ValueError(f"tag_list must be a list or string, got {type(v).__name__}")
+
+    @field_validator("note_list", mode="before")
+    @classmethod
+    def coerce_note_list(cls, v: Any) -> Optional[List[str]]:
+        """
+        Coerce note_list to handle stringified list inputs.
+
+        Accepted inputs:
+        - None              → None
+        - list of strings   → used as-is
+        - stringified list  → parsed and converted to list
+        - single string     → wrapped in a list
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first (e.g. agent may send "['handle1', 'handle2']" or '["handle1", "handle2"]')
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # If not valid JSON, treat as a single note handle
+                return [v.strip()] if v.strip() else None
+
+        if isinstance(v, list):
+            # Ensure all items are strings
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    result.append(item)
+                else:
+                    raise ValueError(
+                        f"note_list items must be strings (note handles), got {type(item).__name__}"
+                    )
+            return result if result else None
+
+        raise ValueError(f"note_list must be a list or string, got {type(v).__name__}")
 
     tag_list: Optional[List[str]] = Field(None, description="List of handles to tags")
     private: Optional[bool] = Field(None, description="Whether the object is private")
