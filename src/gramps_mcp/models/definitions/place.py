@@ -23,10 +23,11 @@ PlaceReference, PlaceExtended, PlaceName, and PlaceProfile.
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
+from .base_entity import ExtendedEntity
 from .core_types import Date, Location, URL
-from .references import Backlinks, BacklinksExtended
+from .references import BacklinksExtended
 
 
 class PlaceName(BaseModel):
@@ -57,14 +58,13 @@ class PlaceReference(BaseModel):
     date: Optional[Date] = Field(None, description="Date of the reference.")
 
 
-class Place(BaseModel):
+class Place(ExtendedEntity["PlaceExtended"]):
     """
     Represents a place in the genealogical database.
 
+    Inherits core identity, reference lists, and extended fields from ExtendedEntity.
+
     Attributes:
-        _class: Object class identifier (must be 'Place').
-        handle: Unique identifier for the place.
-        gramps_id: Alternate user-managed identifier.
         title: The full name of the place.
         name: The place name.
         place_type: The type of place (e.g., 'City', 'Country').
@@ -74,23 +74,10 @@ class Place(BaseModel):
         alt_names: Alternate names for the place.
         alt_loc: Alternate locations for the place.
         placeref_list: References to other places.
-        media_list: References to media associated with the place.
-        citation_list: Handles for citations supporting the place.
-        note_list: Handles for research notes about the place.
-        tag_list: Handles to tags associated with the place.
         urls: URLs associated with the place.
-        private: Whether this record is private.
-        change: Unix timestamp of last modification.
-        backlinks: Objects referring to this place.
-        extended: Extended data with referenced objects.
         profile: Summary profile information.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    class_field: Optional[str] = Field(None, alias="_class", description="Object class name; must be 'Place'.")
-    handle: str = Field(..., description="The unique identifier for the place.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier for the place.")
     title: Optional[str] = Field(None, description="The full name of the place.")
     name: Optional[PlaceName] = Field(None, description="The place name.")
     place_type: Optional[str] = Field(None, description="The type of place.")
@@ -100,15 +87,7 @@ class Place(BaseModel):
     alt_names: Optional[List[PlaceName]] = Field(None, description="Alternate names for the place.")
     alt_loc: Optional[List[Location]] = Field(None, description="Alternate locations for the place.")
     placeref_list: Optional[List[PlaceReference]] = Field(None, description="References to other places.")
-    media_list: Optional[List[Any]] = Field(None, description="References to media associated with the place.")
-    citation_list: Optional[List[str]] = Field(None, description="Handles for citations supporting the place.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes about the place.")
-    tag_list: Optional[List[str]] = Field(None, description="Tags associated with the place.")
     urls: Optional[List[URL]] = Field(None, description="URLs associated with the place.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
-    change: Optional[float] = Field(None, description="Unix timestamp of last modification.")
-    backlinks: Optional[Backlinks] = Field(None, description="Objects referring to this place.")
-    extended: Optional["PlaceExtended"] = Field(None, description="Extended data with referenced objects.")
     profile: Optional[Any] = Field(None, description="Summary profile information.")
 
 

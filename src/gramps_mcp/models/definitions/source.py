@@ -23,52 +23,33 @@ along with their extended and profile variants.
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
+from .base_entity import ExtendedEntity
 from .core_types import Date
-from .references import Backlinks, BacklinksExtended
+from .references import BacklinksExtended
 
 
-class Citation(BaseModel):
+class Citation(ExtendedEntity["CitationExtended"]):
     """
     Represents a citation of a source in the genealogical database.
 
+    Inherits core identity, reference lists, and extended fields from ExtendedEntity.
+
     Attributes:
-        _class: Object class identifier (must be 'Citation').
-        handle: Unique identifier for the citation.
-        gramps_id: Alternate user-managed identifier.
         source_handle: Handle to the source being cited.
         page: The page in the source material being cited.
         confidence: Confidence indicator for the information.
         date: The date of the citation.
         attribute_list: List of attributes about the citation.
-        media_list: References to media associated with the citation.
-        note_list: Handles for research notes about the citation.
-        tag_list: Handles to tags associated with the citation.
-        private: Whether this record is private.
-        change: Unix timestamp of last modification.
-        backlinks: Objects referring to this citation.
-        extended: Extended data with referenced objects.
         profile: Summary profile information.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    class_field: Optional[str] = Field(None, alias="_class", description="Object class name; must be 'Citation'.")
-    handle: str = Field(..., description="The unique identifier for the citation.")
     source_handle: str = Field(..., description="Handle to the source being cited.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier.")
     page: Optional[str] = Field(None, description="The page in the source material.")
     confidence: Optional[int] = Field(None, description="Confidence indicator.")
     date: Optional[Date] = Field(None, description="The date of the citation.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the citation.")
-    media_list: Optional[List[Any]] = Field(None, description="References to media for the citation.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes.")
-    tag_list: Optional[List[str]] = Field(None, description="Tags associated with the citation.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
-    change: Optional[float] = Field(None, description="Unix timestamp of last modification.")
-    backlinks: Optional[Backlinks] = Field(None, description="Objects referring to this citation.")
-    extended: Optional["CitationExtended"] = Field(None, description="Extended data with referenced objects.")
     profile: Optional[Any] = Field(None, description="Summary profile information.")
 
 
@@ -110,47 +91,27 @@ class CitationProfile(BaseModel):
     references: Optional[Any] = Field(None, description="References from other objects.")
 
 
-class Source(BaseModel):
+class Source(ExtendedEntity["SourceExtended"]):
     """
     Represents a source in the genealogical database.
 
+    Inherits core identity, reference lists, and extended fields from ExtendedEntity.
+
     Attributes:
-        _class: Object class identifier (must be 'Source').
-        handle: Unique identifier for the source.
-        gramps_id: Alternate user-managed identifier.
         title: Title for the source.
         author: The author of the source.
         abbrev: An abbreviated name for the source.
         pubinfo: Publication information.
         reporef_list: References to repositories where source can be found.
-        media_list: References to media associated with the source.
         attribute_list: List of attributes about the source.
-        note_list: Handles for research notes about the source.
-        tag_list: Handles to tags associated with the source.
-        private: Whether this record is private.
-        change: Unix timestamp of last modification.
-        backlinks: Objects referring to this source.
-        extended: Extended data with referenced objects.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    class_field: Optional[str] = Field(None, alias="_class", description="Object class name; must be 'Source'.")
-    handle: str = Field(..., description="The unique identifier for the source.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier.")
     title: Optional[str] = Field(None, description="Title for the source.")
     author: Optional[str] = Field(None, description="The author of the source.")
     abbrev: Optional[str] = Field(None, description="Abbreviated name for the source.")
     pubinfo: Optional[str] = Field(None, description="Publication information.")
     reporef_list: Optional[List[Any]] = Field(None, description="References to repositories.")
-    media_list: Optional[List[Any]] = Field(None, description="References to media for the source.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the source.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes.")
-    tag_list: Optional[List[str]] = Field(None, description="Tags associated with the source.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
-    change: Optional[float] = Field(None, description="Unix timestamp of last modification.")
-    backlinks: Optional[Backlinks] = Field(None, description="Objects referring to this source.")
-    extended: Optional["SourceExtended"] = Field(None, description="Extended data with referenced objects.")
 
 
 class SourceExtended(BaseModel):
@@ -208,41 +169,23 @@ class RepositoryReference(BaseModel):
     private: Optional[bool] = Field(None, description="Private object indicator.")
 
 
-class Repository(BaseModel):
+class Repository(ExtendedEntity["RepositoryExtended"]):
     """
     Represents a repository in the genealogical database.
 
+    Inherits core identity, reference lists, and extended fields from ExtendedEntity.
+
     Attributes:
-        _class: Object class identifier (must be 'Repository').
-        handle: Unique identifier for the repository.
-        gramps_id: Alternate user-managed identifier.
         name: Name of the repository.
         type: The type of repository (e.g., 'Library', 'Archive').
         address_list: List of addresses for the repository.
-        note_list: Handles for research notes about the repository.
-        tag_list: Handles to tags associated with the repository.
         urls: URLs associated with the repository.
-        private: Whether this record is private.
-        change: Unix timestamp of last modification.
-        backlinks: Objects referring to this repository.
-        extended: Extended data with referenced objects.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    class_field: Optional[str] = Field(None, alias="_class", description="Object class name; must be 'Repository'.")
-    handle: str = Field(..., description="The unique identifier for the repository.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier.")
     name: Optional[str] = Field(None, description="Name of the repository.")
     type: Optional[str] = Field(None, description="The type of repository.")
     address_list: Optional[List[Any]] = Field(None, description="List of addresses for the repository.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes.")
-    tag_list: Optional[List[str]] = Field(None, description="Tags associated with the repository.")
     urls: Optional[List[Any]] = Field(None, description="URLs associated with the repository.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
-    change: Optional[float] = Field(None, description="Unix timestamp of last modification.")
-    backlinks: Optional[Backlinks] = Field(None, description="Objects referring to this repository.")
-    extended: Optional["RepositoryExtended"] = Field(None, description="Extended data with referenced objects.")
 
 
 class RepositoryExtended(BaseModel):

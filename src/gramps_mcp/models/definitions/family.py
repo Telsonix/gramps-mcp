@@ -23,9 +23,10 @@ ChildReference, FamilyExtended, and FamilyProfile.
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from .references import Backlinks, BacklinksExtended
+from .base_entity import ExtendedEntity
+from .references import BacklinksExtended
 
 
 class ChildReference(BaseModel):
@@ -49,52 +50,30 @@ class ChildReference(BaseModel):
     private: Optional[bool] = Field(None, description="Private object indicator.")
 
 
-class Family(BaseModel):
+class Family(ExtendedEntity["FamilyExtended"]):
     """
     Represents a family relationship in the genealogical database.
 
+    Inherits core identity, reference lists, and extended fields from ExtendedEntity.
+
     Attributes:
-        _class: Object class identifier (must be 'Family').
-        handle: Unique identifier for the family.
-        gramps_id: Alternate user-managed identifier.
         type: The type of relationship (e.g., 'Married', 'Unmarried').
         father_handle: Handle of the father.
         mother_handle: Handle of the mother.
         child_ref_list: References to children in the family.
         event_ref_list: References to events the family participated in.
-        media_list: References to media associated with the family.
         lds_ord_list: List of LDS ordinance events.
         attribute_list: List of attributes about the family.
-        citation_list: Handles for citations supporting the family.
-        note_list: Handles for research notes about the family.
-        tag_list: Handles to tags associated with the family.
-        private: Whether this record is private.
-        change: Unix timestamp of last modification.
-        backlinks: Objects referring to this family.
-        extended: Extended data with referenced objects.
         profile: Summary profile information.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    class_field: Optional[str] = Field(None, alias="_class", description="Object class name; must be 'Family'.")
-    handle: str = Field(..., description="The unique identifier for a family.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier for the family.")
     type: Optional[str] = Field(None, description="The type of relationship between parents.")
     father_handle: Optional[str] = Field(None, description="Handle of the father.")
     mother_handle: Optional[str] = Field(None, description="Handle of the mother.")
     child_ref_list: Optional[List[ChildReference]] = Field(None, description="References to children in the family.")
     event_ref_list: Optional[List[Any]] = Field(None, description="References to events the family participated in.")
-    media_list: Optional[List[Any]] = Field(None, description="References to media associated with family.")
     lds_ord_list: Optional[List[Any]] = Field(None, description="List of LDS ordinance events.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the family.")
-    citation_list: Optional[List[str]] = Field(None, description="Handles for citations supporting the family.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes about the family.")
-    tag_list: Optional[List[str]] = Field(None, description="Tags associated with the family.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
-    change: Optional[float] = Field(None, description="Unix timestamp of last modification.")
-    backlinks: Optional[Backlinks] = Field(None, description="Objects referring to this family.")
-    extended: Optional["FamilyExtended"] = Field(None, description="Extended data with referenced objects.")
     profile: Optional[Any] = Field(None, description="Summary profile information.")
 
 

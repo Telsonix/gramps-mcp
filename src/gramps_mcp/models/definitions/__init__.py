@@ -48,6 +48,9 @@ from .core_types import (
     URL,
 )
 
+# Base entity models
+from .base_entity import BaseEntity, ExtendedEntity, Referenceable
+
 # References
 from .references import Backlinks, BacklinksExtended
 
@@ -87,6 +90,10 @@ __all__ = [
     "StyledTextTag",
     "Surname",
     "URL",
+    # Base entity models
+    "BaseEntity",
+    "ExtendedEntity",
+    "Referenceable",
     # References
     "Backlinks",
     "BacklinksExtended",

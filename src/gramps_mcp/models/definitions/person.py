@@ -23,10 +23,11 @@ PersonReference, PersonExtended, PersonProfile, and TimelinePersonProfile.
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
+from .base_entity import ExtendedEntity
 from .core_types import Address, Name, URL
-from .references import Backlinks, BacklinksExtended
+from .references import BacklinksExtended
 
 
 class PersonReference(BaseModel):
@@ -48,64 +49,42 @@ class PersonReference(BaseModel):
     rel: Optional[str] = Field(None, description="The relationship between the two people.")
 
 
-class Person(BaseModel):
+class Person(ExtendedEntity["PersonExtended"]):
     """
     Represents a person in the genealogical database.
 
+    Inherits core identity, reference lists, and extended fields from ExtendedEntity.
+
     Attributes:
-        _class: Object class identifier (must be 'Person').
-        handle: Unique identifier for the person.
-        gramps_id: Alternate user-managed identifier.
         address_list: List of addresses for the person.
         alternate_names: List of all known names used by the person.
         attribute_list: List of attributes about the person.
         birth_ref_index: Index of birth event in event_ref_list.
         death_ref_index: Index of death event in event_ref_list.
-        change: Unix timestamp of last modification.
-        citation_list: Handles for citations supporting the person.
         event_ref_list: References to events the person participated in.
         family_list: Handles of families where person is a parent.
         gender: Gender/sex (0=unknown, 1=male, 2=female).
         lds_ord_list: List of LDS ordinance events.
-        media_list: References to media associated with the person.
-        note_list: Handles for research notes about the person.
         parent_family_list: Handles of parent family records.
         person_ref_list: References to relationships with other people.
         primary_name: The primary name of the person.
-        private: Whether this record is private.
-        tag_list: Handles to tags associated with the person.
         urls: List of URLs associated with the person.
-        backlinks: Objects referring to this person.
-        extended: Extended data with referenced objects.
         profile: Summary profile information.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    class_field: Optional[str] = Field(None, alias="_class", description="Object class name; must be 'Person'.")
-    handle: str = Field(..., description="The unique identifier for a person.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier for the person.")
     address_list: Optional[List[Address]] = Field(None, description="List of addresses for the person.")
     alternate_names: Optional[List[Name]] = Field(None, description="List of all known names used by the person.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the person.")
     birth_ref_index: Optional[int] = Field(None, description="Index indicating if birth event is assigned.")
     death_ref_index: Optional[int] = Field(None, description="Index indicating if death event is assigned.")
-    change: Optional[float] = Field(None, description="Unix timestamp of last modification.")
-    citation_list: Optional[List[str]] = Field(None, description="Handles for citations supporting the person.")
     event_ref_list: Optional[List[Any]] = Field(None, description="References to events the person participated in.")
     family_list: Optional[List[str]] = Field(None, description="Handles of families where person is parent.")
     gender: Optional[int] = Field(None, description="Gender/sex of the person.")
     lds_ord_list: Optional[List[Any]] = Field(None, description="List of LDS ordinance events.")
-    media_list: Optional[List[Any]] = Field(None, description="References to media associated with person.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes about the person.")
     parent_family_list: Optional[List[str]] = Field(None, description="Handles of parent family records.")
     person_ref_list: Optional[List[PersonReference]] = Field(None, description="References to relationships with other people.")
     primary_name: Optional[Name] = Field(None, description="Primary name of the person.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
-    tag_list: Optional[List[str]] = Field(None, description="Tags associated with the person.")
     urls: Optional[List[URL]] = Field(None, description="URLs associated with the person.")
-    backlinks: Optional[Backlinks] = Field(None, description="Objects referring to this person.")
-    extended: Optional["PersonExtended"] = Field(None, description="Extended data with referenced objects.")
     profile: Optional[Any] = Field(None, description="Summary profile information.")
 
 
