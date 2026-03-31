@@ -269,9 +269,11 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "description": (
             "Create a new family unit or update an existing one. "
             "OPTIONAL: handle (for updates; omit for new), father_handle, mother_handle "
-            "(internal handles from get_type results), child_handles (list of person handles). "
+            "(internal handles), relationship_type ('Marriage', 'Partnership', 'Unmarried', 'Unknown'), "
+            "child_handles (list of person handles). "
             "Use child_handles=['h1','h2'] for convenient child assignment "
             "(auto-converted to API format). "
+            "Use get_types tool to see all valid relationship types. "
             "Returns family's handle and gramps_id. "
             "Always create/reference persons BEFORE adding them to families."
         ),

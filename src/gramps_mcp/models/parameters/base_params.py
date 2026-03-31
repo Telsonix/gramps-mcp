@@ -177,6 +177,46 @@ class BaseDataModel(BaseModel):
             "'note_list' (array of note handles), 'private' (boolean)"
         ),
     )
+    citation_list: Optional[List[str]] = Field(
+        None, description="List of citation handles"
+    )
+
+    @field_validator("citation_list", mode="before")
+    @classmethod
+    def coerce_citation_list(cls, v: Any) -> Optional[List[str]]:
+        """
+        Coerce citation_list to handle stringified list inputs.
+
+        Accepted inputs:
+        - None              → None
+        - list of strings   → used as-is
+        - stringified list  → parsed and converted to list
+        - single string     → wrapped in a list
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first (e.g. agent may send "['handle1', 'handle2']" or '["handle1", "handle2"]')
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # If not valid JSON, treat as a single citation handle
+                return [v.strip()] if v.strip() else None
+
+        if isinstance(v, list):
+            # Ensure all items are strings
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    result.append(item)
+                else:
+                    raise ValueError(
+                        f"citation_list items must be strings (citation handles), got {type(item).__name__}"
+                    )
+            return result if result else None
+
+        raise ValueError(f"citation_list must be a list or string, got {type(v).__name__}")
 
     @field_validator("attribute_list", mode="before")
     @classmethod

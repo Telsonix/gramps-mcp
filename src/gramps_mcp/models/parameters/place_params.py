@@ -25,11 +25,12 @@ API calls supported in this category:
 - DELETE_PLACE: Delete the place
 """
 
+import json
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from .base_params import BaseGetMultipleParams, BaseGetSingleParams
+from .base_params import BaseDataModel, BaseGetMultipleParams, BaseGetSingleParams
 
 
 class PlaceSearchParams(BaseGetMultipleParams):
@@ -44,15 +45,9 @@ class PlaceDetailsParams(BaseGetSingleParams):
     pass
 
 
-class PlaceSaveParams(BaseModel):
+class PlaceSaveParams(BaseDataModel):
     """Parameters for creating or updating a place."""
 
-    handle: Optional[str] = Field(
-        None, min_length=8, description="Place handle (for updates; omit for new place)"
-    )
-    gramps_id: Optional[str] = Field(
-        None, description="Alternate user managed identifier"
-    )
     name: Optional[Union[str, Dict[str, Any]]] = Field(
         None,
         description=(
@@ -77,31 +72,46 @@ class PlaceSaveParams(BaseModel):
     alt_names: Optional[List[str]] = Field(None, description="Alternative names")
     lat: Optional[str] = Field(None, description="Latitude coordinate")
     long: Optional[str] = Field(None, description="Longitude coordinate")
+    title: Optional[str] = Field(None, description="The full name of the place (e.g. 'Twin Falls, ID')")
     urls: Optional[List[dict]] = Field(
         None,
-        description="Associated URLs as dicts with 'path', 'type', 'desc'. Use 'path' for the URL value. Use get_types tool to see all valid URL types (listed under 'URL Types').",
+        description=(
+            "Associated URLs as strings or dictionaries. Strings are converted to {'path': url_value}. "
+            "Dict keys: 'path' (required when using dict), 'type', 'desc', 'private'. "
+            "Examples: ['https://example.com'] or [{'path': 'https://example.com', 'type': 'Web Home'}]. "
+            "Use get_types tool to see all valid URL types (listed under 'URL Types')."
+        ),
     )
 
     @field_validator("urls", mode="before")
     @classmethod
     def normalise_urls(cls, v: Any) -> Optional[List[dict]]:
-        """Normalise 'url' key to 'path' to match the Gramps API schema."""
-        if v is None or not isinstance(v, list):
+        """Coerce strings to dicts and normalise 'url' key to 'path'.
+        
+        Accepts either:
+        - String URLs: converted to {'path': url_value}
+        - Dict URLs: normalised if 'url' key exists (converted to 'path')
+        """
+        if v is None:
             return v
+        if not isinstance(v, list):
+            raise ValueError("urls must be a list")
         result = []
-        for item in v:
-            if isinstance(item, dict) and "url" in item and "path" not in item:
-                item = dict(item)
-                item["path"] = item.pop("url")
-            result.append(item)
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                # Coerce string to dict with 'path' key
+                result.append({"path": item})
+            elif isinstance(item, dict):
+                # Normalise 'url' key to 'path' if needed
+                if "url" in item and "path" not in item:
+                    item = dict(item)
+                    item["path"] = item.pop("url")
+                result.append(item)
+            else:
+                raise ValueError(
+                    f"urls[{i}]: Each URL must be a string or dictionary, got {type(item).__name__}"
+                )
         return result
-    media_list: Optional[List[str]] = Field(None, description="List of media handles")
-    citation_list: Optional[List[str]] = Field(
-        None, description="List of citation handles"
-    )
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
-    tag_list: Optional[List[str]] = Field(None, description="List of tag handles")
-    private: Optional[bool] = Field(None, description="Mark as private")
 
     @field_validator("name", mode="before")
     @classmethod

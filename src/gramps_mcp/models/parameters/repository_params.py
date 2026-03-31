@@ -96,19 +96,40 @@ class RepositoryData(BaseDataModel):
     )
     urls: Optional[List[Dict[str, Any]]] = Field(
         None,
-        description="List of URLs as dicts with 'path', 'type', 'desc'. Use 'path' for the URL value. Use get_types tool to see all valid URL types (listed under 'URL Types').",
+        description=(
+            "List of URLs as strings or dictionaries. Strings are converted to {'path': url_value}. "
+            "Dict keys: 'path' (required when using dict), 'type', 'desc', 'private'. "
+            "Examples: ['https://example.com'] or [{'path': 'https://example.com', 'type': 'Web Home'}]. "
+            "Use get_types tool to see all valid URL types (listed under 'URL Types')."
+        ),
     )
 
     @field_validator("urls", mode="before")
     @classmethod
     def normalise_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Normalise 'url' key to 'path' to match the Gramps API schema."""
-        if v is None or not isinstance(v, list):
+        """Coerce strings to dicts and normalise 'url' key to 'path'.
+        
+        Accepts either:
+        - String URLs: converted to {'path': url_value}
+        - Dict URLs: normalised if 'url' key exists (converted to 'path')
+        """
+        if v is None:
             return v
+        if not isinstance(v, list):
+            raise ValueError("urls must be a list")
         result = []
-        for item in v:
-            if isinstance(item, dict) and "url" in item and "path" not in item:
-                item = dict(item)
-                item["path"] = item.pop("url")
-            result.append(item)
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                # Coerce string to dict with 'path' key
+                result.append({"path": item})
+            elif isinstance(item, dict):
+                # Normalise 'url' key to 'path' if needed
+                if "url" in item and "path" not in item:
+                    item = dict(item)
+                    item["path"] = item.pop("url")
+                result.append(item)
+            else:
+                raise ValueError(
+                    f"urls[{i}]: Each URL must be a string or dictionary, got {type(item).__name__}"
+                )
         return result

@@ -173,10 +173,11 @@ class PersonData(BaseDataModel):
     @field_validator("urls", mode="before")
     @classmethod
     def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate and normalise url items.
+        """Coerce strings to dicts and normalise url items.
 
-        Accepts dicts with 'path' or 'url' key (normalises 'url' → 'path').
-        Rejects plain strings with a helpful error message.
+        Accepts:
+        - String URLs: converted to {'path': url_value}
+        - Dict URLs: normalised if 'url' key exists (converted to 'path')
         """
         if v is None:
             return v
@@ -187,21 +188,19 @@ class PersonData(BaseDataModel):
         normalised = []
         for i, item in enumerate(v):
             if isinstance(item, str):
+                # Coerce string to dict with 'path' key
+                normalised.append({"path": item})
+            elif isinstance(item, dict):
+                # Reason: agents commonly use 'url' instead of the API field name 'path'.
+                # Silently normalise so the value reaches the API correctly.
+                if "url" in item and "path" not in item:
+                    item = dict(item)
+                    item["path"] = item.pop("url")
+                normalised.append(item)
+            else:
                 raise ValueError(
-                    f"urls[{i}]: URL must be a dictionary with keys like 'path', 'type', 'desc', "
-                    f"not a string. Got '{item}'. "
-                    f"Correct format: {{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Description'}}"
+                    f"urls[{i}]: Each URL must be a string or dictionary, got {type(item).__name__}"
                 )
-            if not isinstance(item, dict):
-                raise ValueError(
-                    f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
-                )
-            # Reason: agents commonly use 'url' instead of the API field name 'path'.
-            # Silently normalise so the value reaches the API correctly.
-            if "url" in item and "path" not in item:
-                item = dict(item)
-                item["path"] = item.pop("url")
-            normalised.append(item)
         return normalised
 
     @field_validator("alternate_names", mode="before")
@@ -317,6 +316,80 @@ class PersonData(BaseDataModel):
             f"event_ref_list must be a list or string, got {type(v).__name__}"
         )
 
+    @field_validator("family_list", mode="before")
+    @classmethod
+    def coerce_family_list(cls, v: Any) -> Optional[List[str]]:
+        """
+        Coerce family_list to handle stringified list inputs.
+
+        Accepted inputs:
+        - None              → None
+        - list of strings   → used as-is
+        - stringified list  → parsed and converted to list
+        - single string     → wrapped in a list
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # If not valid JSON, treat as a single family handle
+                return [v.strip()] if v.strip() else None
+
+        if isinstance(v, list):
+            # Ensure all items are strings
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    result.append(item)
+                else:
+                    raise ValueError(
+                        f"family_list items must be strings (family handles), got {type(item).__name__}"
+                    )
+            return result if result else None
+
+        raise ValueError(f"family_list must be a list or string, got {type(v).__name__}")
+
+    @field_validator("parent_family_list", mode="before")
+    @classmethod
+    def coerce_parent_family_list(cls, v: Any) -> Optional[List[str]]:
+        """
+        Coerce parent_family_list to handle stringified list inputs.
+
+        Accepted inputs:
+        - None              → None
+        - list of strings   → used as-is
+        - stringified list  → parsed and converted to list
+        - single string     → wrapped in a list
+        """
+        if v is None:
+            return None
+
+        if isinstance(v, str):
+            # Try JSON decode first
+            try:
+                v = json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # If not valid JSON, treat as a single parent family handle
+                return [v.strip()] if v.strip() else None
+
+        if isinstance(v, list):
+            # Ensure all items are strings
+            result = []
+            for item in v:
+                if isinstance(item, str):
+                    result.append(item)
+                else:
+                    raise ValueError(
+                        f"parent_family_list items must be strings (family handles), got {type(item).__name__}"
+                    )
+            return result if result else None
+
+        raise ValueError(f"parent_family_list must be a list or string, got {type(v).__name__}")
+
     event_ref_list: Optional[List[EventReference]] = Field(
         None,
         description=(
@@ -334,12 +407,10 @@ class PersonData(BaseDataModel):
     urls: Optional[List[Dict[str, Any]]] = Field(
         None,
         description=(
-            "List of URLs as dictionaries. Each URL should have optional keys: "
-            "'path' (the URL string — use 'path', NOT 'url'), "
-            "'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
-            "Example: [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}]. "
+            "List of URLs as strings or dictionaries. Strings are converted to {'path': url_value}. "
+            "Dict keys: 'path' (required when using dict), 'type' (e.g., 'Web Home'), 'desc' (description), 'private' (boolean). "
+            "Examples: ['https://example.com'] or [{'path': 'https://example.com', 'type': 'Web Home', 'desc': 'Personal website'}]. "
             "Note: use 'path' for the URL value — 'url' is also accepted and auto-normalised. "
-            "Must be a list of dicts, not strings. "
             "Use get_types tool to see all valid URL types (listed under 'URL Types')."
         ),
     )

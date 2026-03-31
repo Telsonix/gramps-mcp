@@ -27,11 +27,12 @@ API calls supported in this category:
 - PUT_MEDIA_FILE: Update an existing media object's file
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from .base_params import BaseGetMultipleParams
+from .base_params import BaseDataModel, BaseGetMultipleParams
 
 
 class MediaSearchParams(BaseGetMultipleParams):
@@ -79,20 +80,14 @@ class MediaFileParams(BaseModel):
     )
 
 
-class MediaSaveParams(BaseModel):
+class MediaSaveParams(BaseDataModel):
     """Parameters for creating or updating a media item."""
 
-    handle: Optional[str] = Field(None, description="Media handle for updates")
     desc: str = Field(..., description="Media description")
     path: Optional[str] = Field(
         None, min_length=1, description="File path or URL to media"
     )
-    description: Optional[str] = Field(None, description="Media description")
     mime: Optional[str] = Field(None, description="MIME type of the media file")
-    citation_list: Optional[List[str]] = Field(
-        None, description="List of citation handles"
-    )
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
     date: Optional[Dict[str, Any]] = Field(
         None,
         description=(

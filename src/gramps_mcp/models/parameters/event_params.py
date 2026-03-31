@@ -26,11 +26,12 @@ API calls supported in this category:
 - GET_EVENT_SPAN: Get elapsed time span between two events
 """
 
+import json
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from .base_params import BaseGetMultipleParams
+from .base_params import BaseDataModel, BaseGetMultipleParams
 
 
 def _coerce_date(value: Union[str, Dict[str, Any], None]) -> Optional[Dict[str, Any]]:
@@ -65,12 +66,9 @@ class EventSearchParams(BaseGetMultipleParams):
     )
 
 
-class EventSaveParams(BaseModel):
+class EventSaveParams(BaseDataModel):
     """Parameters for creating or updating an event."""
 
-    handle: Optional[str] = Field(
-        None, description="Event's handle (for updates; omit for new event)"
-    )
     type: str = Field(
         description=(
             "Event type string, e.g. 'Birth', 'Death', 'Marriage', 'Burial', "
@@ -90,10 +88,6 @@ class EventSaveParams(BaseModel):
     )
     description: Optional[str] = Field(None, description="Event description")
     place: Optional[str] = Field(None, description="Place handle where event occurred")
-    citation_list: Optional[List[str]] = Field(
-        None, description="List of citation handles (optional)"
-    )
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
 
     @field_validator("date", mode="before")
     @classmethod

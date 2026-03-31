@@ -26,9 +26,12 @@ API calls supported in this category:
 - GET_FAMILY_TIMELINE: Get the timeline for all the people in a specific family
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
+
+from .base_params import BaseDataModel
 
 
 class ChildReference(BaseModel):
@@ -42,12 +45,9 @@ class ChildReference(BaseModel):
     private: bool = Field(default=False)
 
 
-class FamilySaveParams(BaseModel):
+class FamilySaveParams(BaseDataModel):
     """Parameters for creating or updating a family."""
 
-    handle: Optional[str] = Field(
-        None, description="Family's handle (for updates; omit for new family)"
-    )
     father_handle: Optional[str] = Field(None, description="Father's handle")
     mother_handle: Optional[str] = Field(None, description="Mother's handle")
     relationship_type: Optional[str] = Field(
@@ -77,22 +77,6 @@ class FamilySaveParams(BaseModel):
             "List of event references as dictionaries. Each reference must have 'ref' key (event handle). "
             "Example: [{'ref': 'event_handle', 'role': 'Primary'}]. "
             "Optional keys: 'role' (role in event), 'attribute_list' (attributes), 'note_list' (note handles), 'private' (boolean)"
-        ),
-    )
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
-    urls: Optional[List[dict]] = Field(
-        None,
-        description=(
-            "List of URLs as dictionaries with optional keys 'path', 'type', 'desc', 'private'. "
-            "Example: [{'path': 'https://example.com', 'type': 'Web Home'}]. "
-            "Use get_types tool to see all valid URL types (listed under 'URL Types')."
-        ),
-    )
-    media_list: Optional[List[dict]] = Field(
-        None,
-        description=(
-            "List of media references as dictionaries. Each reference must have 'ref' key (media handle). "
-            "Example: [{'ref': 'media_handle'}]. Optional keys: 'attribute_list', 'citation_list', 'note_list', 'private', 'rect'"
         ),
     )
 
@@ -158,34 +142,6 @@ class FamilySaveParams(BaseModel):
                 )
         return coerced
 
-    @field_validator("urls", mode="before")
-    @classmethod
-    def validate_urls(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
-        """Validate and normalise url items.
-
-        Accepts dicts with 'path' or 'url' key (normalises 'url' → 'path').
-        """
-        if v is None:
-            return v
-        if not isinstance(v, list):
-            raise ValueError(f"urls must be a list of dictionaries, got {type(v).__name__}")
-        normalised = []
-        for i, item in enumerate(v):
-            if isinstance(item, str):
-                raise ValueError(
-                    f"urls[{i}]: URL must be a dictionary, not a string. Got '{item}'. "
-                    f"Correct format: {{'path': 'https://example.com', 'type': 'Web Home'}}"
-                )
-            if not isinstance(item, dict):
-                raise ValueError(
-                    f"urls[{i}]: Each URL must be a dictionary, got {type(item).__name__}"
-                )
-            if "url" in item and "path" not in item:
-                item = dict(item)
-                item["path"] = item.pop("url")
-            normalised.append(item)
-        return normalised
-
     @field_validator("media_list", mode="before")
     @classmethod
     def validate_media_list(cls, v: Any) -> Optional[List[Dict[str, Any]]]:
@@ -220,30 +176,45 @@ class FamilySaveParams(BaseModel):
     @model_serializer
     def serialize_model(self) -> Dict[str, Any]:
         """
-        Custom serializer that converts child_handles to child_ref_list format.
+        Custom serializer that converts child_handles to child_ref_list format
+        and maps relationship_type to the API's 'type' field.
 
         The Gramps Web API expects child_ref_list with full reference objects,
         not a simple list of handles. This serializer performs that conversion.
         """
         data = {}
 
-        # Add standard fields
+        # BaseDataModel fields
         if self.handle is not None:
             data["handle"] = self.handle
+        if self.gramps_id is not None:
+            data["gramps_id"] = self.gramps_id
+        if self.change is not None:
+            data["change"] = self.change
+        if self.private is not None:
+            data["private"] = self.private
+        if self.note_list is not None:
+            data["note_list"] = self.note_list
+        if self.citation_list is not None:
+            data["citation_list"] = self.citation_list
+        if self.media_list is not None:
+            data["media_list"] = self.media_list
+        if self.tag_list is not None:
+            data["tag_list"] = self.tag_list
+        if self.attribute_list is not None:
+            data["attribute_list"] = self.attribute_list
+
+        # Family-specific fields
         if self.father_handle is not None:
             data["father_handle"] = self.father_handle
         if self.mother_handle is not None:
             data["mother_handle"] = self.mother_handle
-        if self.relationship_type is not None:
-            data["relationship_type"] = self.relationship_type
         if self.event_ref_list is not None:
             data["event_ref_list"] = self.event_ref_list
-        if self.note_list is not None:
-            data["note_list"] = self.note_list
-        if self.urls is not None:
-            data["urls"] = self.urls
-        if self.media_list is not None:
-            data["media_list"] = self.media_list
+        # Reason: API uses 'type' for the relationship type, but the model uses
+        # 'relationship_type' for clarity to avoid clashing with Python builtins.
+        if self.relationship_type is not None:
+            data["type"] = self.relationship_type
 
         # Convert child_handles to child_ref_list if provided
         # Reason: The API expects child_ref_list with full reference objects,
