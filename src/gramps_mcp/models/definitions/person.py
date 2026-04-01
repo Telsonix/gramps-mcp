@@ -85,7 +85,7 @@ class Person(ExtendedEntity["PersonExtended"]):
     person_ref_list: Optional[List[PersonReference]] = Field(None, description="References to relationships with other people.")
     primary_name: Optional[Name] = Field(None, description="Primary name of the person.")
     urls: Optional[List[URL]] = Field(None, description="URLs associated with the person.")
-    profile: Optional[Any] = Field(None, description="Summary profile information.")
+    profile: Optional["PersonProfile"] = Field(None, description="Summary profile information.")
 
 
 class PersonExtended(BaseModel):

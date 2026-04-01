@@ -88,7 +88,7 @@ class Place(ExtendedEntity["PlaceExtended"]):
     alt_loc: Optional[List[Location]] = Field(None, description="Alternate locations for the place.")
     placeref_list: Optional[List[PlaceReference]] = Field(None, description="References to other places.")
     urls: Optional[List[URL]] = Field(None, description="URLs associated with the place.")
-    profile: Optional[Any] = Field(None, description="Summary profile information.")
+    profile: Optional["PlaceProfile"] = Field(None, description="Summary profile information.")
 
 
 class PlaceExtended(BaseModel):

@@ -74,7 +74,7 @@ class Family(ExtendedEntity["FamilyExtended"]):
     event_ref_list: Optional[List[Any]] = Field(None, description="References to events the family participated in.")
     lds_ord_list: Optional[List[Any]] = Field(None, description="List of LDS ordinance events.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the family.")
-    profile: Optional[Any] = Field(None, description="Summary profile information.")
+    profile: Optional["FamilyProfile"] = Field(None, description="Summary profile information.")
 
 
 class FamilyExtended(BaseModel):

@@ -50,7 +50,7 @@ class Citation(ExtendedEntity["CitationExtended"]):
     confidence: Optional[int] = Field(None, description="Confidence indicator.")
     date: Optional[Date] = Field(None, description="The date of the citation.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the citation.")
-    profile: Optional[Any] = Field(None, description="Summary profile information.")
+    profile: Optional["CitationProfile"] = Field(None, description="Summary profile information.")
 
 
 class CitationExtended(BaseModel):

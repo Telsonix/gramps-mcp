@@ -96,7 +96,7 @@ class Event(ExtendedEntity["EventExtended"]):
     place: Optional[str] = Field(None, description="Handle to the place where event occurred.")
     description: Optional[str] = Field(None, description="A description for the event.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the event.")
-    profile: Optional[Any] = Field(None, description="Summary profile information.")
+    profile: Optional["EventProfile"] = Field(None, description="Summary profile information.")
 
 
 class EventExtended(BaseModel):

@@ -73,7 +73,7 @@ class Media(ExtendedEntity["MediaExtended"]):
     date: Optional[Date] = Field(None, description="Date associated with the media.")
     checksum: Optional[str] = Field(None, description="Checksum for integrity validation.")
     attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the media.")
-    profile: Optional[Any] = Field(None, description="Summary profile information.")
+    profile: Optional["MediaProfile"] = Field(None, description="Summary profile information.")
 
 
 class MediaExtended(BaseModel):
