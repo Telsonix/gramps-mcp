@@ -23,7 +23,7 @@ ChildReference, FamilyExtended, and FamilyProfile.
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .base_entity import ExtendedEntity
 from .references import BacklinksExtended
@@ -31,105 +31,188 @@ from .references import BacklinksExtended
 
 class ChildReference(BaseModel):
     """
-    A reference to a child in a family relationship.
+    A reference to a child's membership in a family, with parentage relationship types.
+
+    Records the relationship between a child and each parent in the family.
+    Both biological and non-biological relationships (adopted, step, foster, etc.) are supported.
 
     Attributes:
-        ref: The handle of the child referenced.
-        frel: Relationship between the child and father.
-        mrel: Relationship between the child and mother.
-        citation_list: Handles for citations supporting this child reference.
-        note_list: Handles for research notes about this child membership.
-        private: Whether this record is private.
+        ref: Handle of the child Person object. Required.
+        frel: Father-child relationship type. Examples: 'Birth' (biological), 'Adopted',
+            'Stepchild', 'Foster', 'Sponsored', 'Unknown'. Defaults to 'Birth' if null.
+        mrel: Mother-child relationship type. Same values as frel.
+            Examples: 'Birth', 'Adopted', 'Stepchild', 'Foster', 'Unknown'.
+        citation_list: Handles for citations supporting this child relationship.
+        note_list: Handles for research notes about this child's family membership.
+        private: True if this child reference is confidential.
     """
 
-    ref: str = Field(..., description="The handle of the child referenced.")
-    frel: Optional[str] = Field(None, description="Relationship between the child and father.")
-    mrel: Optional[str] = Field(None, description="Relationship between the child and mother.")
-    citation_list: Optional[List[str]] = Field(None, description="Handles for citations supporting the child reference.")
-    note_list: Optional[List[str]] = Field(None, description="Handles for research notes about child membership.")
-    private: Optional[bool] = Field(None, description="Private object indicator.")
+    ref: str = Field(..., description="Handle of the child Person object. Required.")
+    frel: Optional[str] = Field(None, description="Father-child relationship: 'Birth' (biological), 'Adopted', 'Stepchild', 'Foster', 'Sponsored', 'Unknown'.")
+    mrel: Optional[str] = Field(None, description="Mother-child relationship: 'Birth' (biological), 'Adopted', 'Stepchild', 'Foster', 'Sponsored', 'Unknown'.")
+    citation_list: Optional[List[str]] = Field(None, description="Handles for citations supporting this child relationship.")
+    note_list: Optional[List[str]] = Field(None, description="Handles for research notes about this child's family membership.")
+    private: Optional[bool] = Field(None, description="True if this child reference is confidential.")
 
 
 class Family(ExtendedEntity["FamilyExtended"]):
     """
-    Represents a family relationship in the genealogical database.
+    Represents a family relationship unit in the genealogical database.
 
     Inherits core identity, reference lists, and extended fields from ExtendedEntity.
 
+    A Family groups two parents (father and mother, in any combination) and their children.
+    It records the relationship type between the parents, associated events (marriage, divorce),
+    and provides the central link for building family trees.
+
     Attributes:
-        type: The type of relationship (e.g., 'Married', 'Unmarried').
-        father_handle: Handle of the father.
-        mother_handle: Handle of the mother.
-        child_ref_list: References to children in the family.
-        event_ref_list: References to events the family participated in.
-        lds_ord_list: List of LDS ordinance events.
-        attribute_list: List of attributes about the family.
-        profile: Summary profile information.
+        type: Relationship type between the parents (optional, max 100 chars).
+            Examples: 'Married', 'Unmarried', 'Civil Union', 'Unknown', 'Partners'.
+        father_handle: Handle of the Person who is the father/first parent (optional, max 50 chars).
+            Null if the father is unknown or not recorded.
+        mother_handle: Handle of the Person who is the mother/second parent (optional, max 50 chars).
+            Null if the mother is unknown or not recorded.
+        child_ref_list: ChildReference objects for each child in the family. Each reference
+            includes the child's person handle and the parentage relationship type (birth/adopted/etc.).
+        event_ref_list: EventReference objects for family events (marriage, divorce, separation, etc.).
+            Each reference includes the event handle and role.
+        lds_ord_list: LDS ordinance records (sealing to spouse) associated with this family.
+        attribute_list: Additional key-value properties for this family.
+        profile: Read-only profile summary (FamilyProfile) with parents, children, and key events.
     """
 
-    type: Optional[str] = Field(None, description="The type of relationship between parents.")
-    father_handle: Optional[str] = Field(None, description="Handle of the father.")
-    mother_handle: Optional[str] = Field(None, description="Handle of the mother.")
-    child_ref_list: Optional[List[ChildReference]] = Field(None, description="References to children in the family.")
-    event_ref_list: Optional[List[Any]] = Field(None, description="References to events the family participated in.")
-    lds_ord_list: Optional[List[Any]] = Field(None, description="List of LDS ordinance events.")
-    attribute_list: Optional[List[Any]] = Field(None, description="List of attributes about the family.")
-    profile: Optional["FamilyProfile"] = Field(None, description="Summary profile information.")
+    type: Optional[str] = Field(
+        None,
+        description="Relationship type between parents. Examples: 'Married', 'Unmarried', 'Civil Union', 'Partners', 'Unknown'. Max 100 chars.",
+    )
+    father_handle: Optional[str] = Field(
+        None,
+        description="Handle of the father/first parent Person. Null if unknown or unrecorded. Max 50 chars.",
+    )
+    mother_handle: Optional[str] = Field(
+        None,
+        description="Handle of the mother/second parent Person. Null if unknown or unrecorded. Max 50 chars.",
+    )
+    child_ref_list: Optional[List[ChildReference]] = Field(None, description="ChildReference objects for each child. Each includes child handle and parentage type (birth/adopted/stepchild/etc.).")
+    event_ref_list: Optional[List[Any]] = Field(None, description="EventReference objects for family events (marriage, divorce, separation, etc.).")
+    lds_ord_list: Optional[List[Any]] = Field(None, description="LDS ordinance records (sealing to spouse) for this family.")
+    attribute_list: Optional[List[Any]] = Field(None, description="Additional key-value properties for this family.")
+    profile: Optional["FamilyProfile"] = Field(None, description="Read-only profile summary with parents, children, and key events. Auto-populated by the API.")
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def validate_type(cls, v: Any) -> Optional[str]:
+        """Validate type: optional, max 100 chars, trimmed.
+
+        Args:
+            v: Relationship type value (string or None).
+
+        Returns:
+            Trimmed type string or None.
+
+        Raises:
+            ValueError: If type exceeds 100 characters.
+
+        Example:
+            "  Married  " → "Married"
+            "Civil Union" → "Civil Union"
+            None → None
+        """
+        if v is None or v == "":
+            return None
+        v = str(v).strip() if not isinstance(v, str) else v.strip()
+        if len(v) > 100:
+            raise ValueError(f"type exceeds 100 chars (got {len(v)})")
+        return v
+
+    @field_validator("father_handle", "mother_handle", mode="before")
+    @classmethod
+    def validate_parent_handle(cls, v: Any) -> Optional[str]:
+        """Validate parent handle: optional, max 50 chars, trimmed, non-empty.
+
+        Args:
+            v: Parent handle value (string or None).
+
+        Returns:
+            Trimmed handle or None.
+
+        Raises:
+            ValueError: If handle exceeds 50 chars or is empty string.
+
+        Example:
+            "  c0d0a0d0a0d0a0d0  " → "c0d0a0d0a0d0a0d0"
+            "" → None
+            None → None
+        """
+        if v is None or v == "":
+            return None
+        v = str(v).strip() if not isinstance(v, str) else v.strip()
+        if v == "":
+            return None
+        if len(v) > 50:
+            raise ValueError(f"handle exceeds 50 chars (got {len(v)})")
+        return v
 
 
 class FamilyExtended(BaseModel):
     """
-    Extended family data with full details of all referenced objects.
+    Extended family data with fully dereferenced objects instead of just handles.
+
+    Populated only when the extended query parameter is requested. Contains complete
+    records for all objects referenced by the family.
 
     Attributes:
-        father: The person record for the father if known.
-        mother: The person record for the mother if known.
-        children: The person records for any referenced children.
-        citations: Citation records for any referenced citations.
-        events: Event records for any referenced events.
-        media: Media records for any referenced media objects.
-        notes: Note records for any referenced notes.
-        tags: Tag records for any referenced tags.
-        backlinks: Objects referring to this family (extended).
+        father: Full Person record for the father/first parent. Null if none assigned.
+        mother: Full Person record for the mother/second parent. Null if none assigned.
+        children: Full Person records for each child referenced in child_ref_list.
+        citations: Full Citation records for each citation referenced by this family.
+        events: Full Event records for each event in event_ref_list.
+        media: Full Media records for each media item attached to this family.
+        notes: Full Note records for each note attached to this family.
+        tags: Full Tag records for each tag applied to this family.
+        backlinks: Full records of all objects that reference this family.
     """
 
-    father: Optional[Any] = Field(None, description="Person record for the father.")
-    mother: Optional[Any] = Field(None, description="Person record for the mother.")
-    children: Optional[List[Any]] = Field(None, description="Person records for children.")
-    citations: Optional[List[Any]] = Field(None, description="Citation records for referenced citations.")
-    events: Optional[List[Any]] = Field(None, description="Event records for referenced events.")
-    media: Optional[List[Any]] = Field(None, description="Media records for referenced media objects.")
-    notes: Optional[List[Any]] = Field(None, description="Note records for referenced notes.")
-    tags: Optional[List[Any]] = Field(None, description="Tag records for referenced tags.")
-    backlinks: Optional[BacklinksExtended] = Field(None, description="Objects referring to this family (extended).")
+    father: Optional[Any] = Field(None, description="Full Person record for the father/first parent. Null if not assigned.")
+    mother: Optional[Any] = Field(None, description="Full Person record for the mother/second parent. Null if not assigned.")
+    children: Optional[List[Any]] = Field(None, description="Full Person records for all children referenced in child_ref_list.")
+    citations: Optional[List[Any]] = Field(None, description="Full Citation records for each citation referenced by this family.")
+    events: Optional[List[Any]] = Field(None, description="Full Event records for each event in event_ref_list.")
+    media: Optional[List[Any]] = Field(None, description="Full Media records for each media item attached to this family.")
+    notes: Optional[List[Any]] = Field(None, description="Full Note records for each note attached to this family.")
+    tags: Optional[List[Any]] = Field(None, description="Full Tag records for each tag applied to this family.")
+    backlinks: Optional[BacklinksExtended] = Field(None, description="Full records of all objects (people, events) that reference this family.")
 
 
 class FamilyProfile(BaseModel):
     """
-    Profile summary of a family with key members and events.
+    Read-only profile summary of a family with key members and events.
+
+    Returned by the API for display purposes. Contains pre-computed display fields
+    including person profiles for parents and children.
 
     Attributes:
-        handle: Unique identifier for the family.
-        gramps_id: Alternate user-managed identifier.
-        father: Person profile for the father.
-        mother: Person profile for the mother.
-        children: Person profiles for children in the family.
-        family_surname: The surname of the family.
-        relationship: The relationship type between parents.
-        marriage: Marriage event profile.
-        divorce: Divorce event profile.
-        events: Event profiles for all family events.
-        references: References from other objects.
+        handle: Unique handle (ID) of the family.
+        gramps_id: Alternate user-managed identifier. Examples: 'F0001', 'F01234'.
+        father: Person profile for the father/first parent. Null if not recorded.
+        mother: Person profile for the mother/second parent. Null if not recorded.
+        children: Person profiles for all children in baby_ref_list.
+        family_surname: Derived surname for the family unit. Example: 'Smith'.
+        relationship: Relationship type label. Examples: 'Married', 'Unmarried', 'Civil Union'.
+        marriage: Marriage event profile with date and place. Null if no marriage event.
+        divorce: Divorce event profile with date and place. Null if no divorce event.
+        events: Profiles for all events associated with this family.
+        references: Summary count or list of objects referencing this family.
     """
 
-    handle: Optional[str] = Field(None, description="Unique identifier for the family.")
-    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier.")
-    father: Optional[Any] = Field(None, description="Person profile for the father.")
-    mother: Optional[Any] = Field(None, description="Person profile for the mother.")
-    children: Optional[List[Any]] = Field(None, description="Person profiles for children.")
-    family_surname: Optional[str] = Field(None, description="Surname of the family.")
-    relationship: Optional[str] = Field(None, description="Relationship type between parents.")
-    marriage: Optional[Any] = Field(None, description="Marriage event profile.")
-    divorce: Optional[Any] = Field(None, description="Divorce event profile.")
-    events: Optional[List[Any]] = Field(None, description="Event profiles for all family events.")
-    references: Optional[Any] = Field(None, description="References from other objects.")
+    handle: Optional[str] = Field(None, description="Unique handle (ID) of the family.")
+    gramps_id: Optional[str] = Field(None, description="Alternate user-managed identifier. Examples: 'F0001', 'F01234'.")
+    father: Optional[Any] = Field(None, description="Person profile for the father/first parent. Null if not recorded.")
+    mother: Optional[Any] = Field(None, description="Person profile for the mother/second parent. Null if not recorded.")
+    children: Optional[List[Any]] = Field(None, description="Person profiles for all children in this family.")
+    family_surname: Optional[str] = Field(None, description="Derived surname for the family unit. Example: 'Smith'.")
+    relationship: Optional[str] = Field(None, description="Relationship type label. Examples: 'Married', 'Unmarried', 'Civil Union', 'Partners'.")
+    marriage: Optional[Any] = Field(None, description="Marriage event profile with date and place. Null if no marriage event.")
+    divorce: Optional[Any] = Field(None, description="Divorce event profile with date and place. Null if no divorce event.")
+    events: Optional[List[Any]] = Field(None, description="Profiles for all events associated with this family.")
+    references: Optional[Any] = Field(None, description="Summary count or list of objects referencing this family.")

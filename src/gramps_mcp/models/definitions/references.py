@@ -28,53 +28,53 @@ from pydantic import BaseModel, Field
 
 class Backlinks(BaseModel):
     """
-    A mapping of object types to handles of objects referring to the current object.
+    A mapping of object types to handle lists of objects referring to the current object.
 
-    This model tracks backreferences - which objects reference the current object.
+    This model tracks reverse references (backlinks) — which objects reference the current
+    object by handle. Used in ExtendedEntity for lightweight backlink lookup.
 
     Attributes:
-        person: Handles of people referring to the object.
-        family: Handles of families referring to the object.
-        event: Handles of events referring to the object.
-        place: Handles of places referring to the object.
-        source: Handles of sources referring to the object.
-        citation: Handles of citations referring to the object.
-        media: Handles of media items referring to the object.
+        person: Handles of Person records that reference this object.
+        family: Handles of Family records that reference this object.
+        event: Handles of Event records that reference this object.
+        place: Handles of Place records that reference this object.
+        source: Handles of Source records that reference this object.
+        citation: Handles of Citation records that reference this object.
+        media: Handles of Media records that reference this object.
     """
 
-    person: Optional[List[str]] = Field(None, description="Handles of people referring to the object.")
-    family: Optional[List[str]] = Field(None, description="Handles of families referring to the object.")
-    event: Optional[List[str]] = Field(None, description="Handles of events referring to the object.")
-    place: Optional[List[str]] = Field(None, description="Handles of places referring to the object.")
-    source: Optional[List[str]] = Field(None, description="Handles of sources referring to the object.")
-    citation: Optional[List[str]] = Field(None, description="Handles of citations referring to the object.")
-    media: Optional[List[str]] = Field(None, description="Handles of media items referring to the object.")
+    person: Optional[List[str]] = Field(None, description="Handles of Person records that reference this object.")
+    family: Optional[List[str]] = Field(None, description="Handles of Family records that reference this object.")
+    event: Optional[List[str]] = Field(None, description="Handles of Event records that reference this object.")
+    place: Optional[List[str]] = Field(None, description="Handles of Place records that reference this object.")
+    source: Optional[List[str]] = Field(None, description="Handles of Source records that reference this object.")
+    citation: Optional[List[str]] = Field(None, description="Handles of Citation records that reference this object.")
+    media: Optional[List[str]] = Field(None, description="Handles of Media records that reference this object.")
 
 
 class BacklinksExtended(BaseModel):
     """
-    Extended backlinks containing full objects instead of just handles.
+    Extended backlinks containing full object records instead of just handles.
 
-    This model provides detailed information about all objects referring to the current object,
-    including their complete data rather than just handles.
+    Provides detailed information about all objects that reference the current object,
+    with complete data rather than just handles. Populated by the extended query parameter.
 
-    Note: The actual model types (Person, Family, Event, Place, Source, Citation, Media)
-    are forward-declared at the module level to avoid circular imports.
+    Note: Actual types (Person, Family, Event, etc.) are declared as Any due to circular imports.
 
     Attributes:
-        person: Full person objects referring to the object.
-        family: Full family objects referring to the object.
-        event: Full event objects referring to the object.
-        place: Full place objects referring to the object.
-        source: Full source objects referring to the object.
-        citation: Full citation objects referring to the object.
-        media: Full media objects referring to the object.
+        person: Full Person records for people that reference this object.
+        family: Full Family records for families that reference this object.
+        event: Full Event records for events that reference this object.
+        place: Full Place records for places that reference this object.
+        source: Full Source records for sources that reference this object.
+        citation: Full Citation records for citations that reference this object.
+        media: Full Media records for media items that reference this object.
     """
 
-    person: Optional[List[Any]] = Field(None, description="Person objects referring to the object.")
-    family: Optional[List[Any]] = Field(None, description="Family objects referring to the object.")
-    event: Optional[List[Any]] = Field(None, description="Event objects referring to the object.")
-    place: Optional[List[Any]] = Field(None, description="Place objects referring to the object.")
-    source: Optional[List[Any]] = Field(None, description="Source objects referring to the object.")
-    citation: Optional[List[Any]] = Field(None, description="Citation objects referring to the object.")
-    media: Optional[List[Any]] = Field(None, description="Media objects referring to the object.")
+    person: Optional[List[Any]] = Field(None, description="Full Person records for people that reference this object.")
+    family: Optional[List[Any]] = Field(None, description="Full Family records for families that reference this object.")
+    event: Optional[List[Any]] = Field(None, description="Full Event records for events that reference this object.")
+    place: Optional[List[Any]] = Field(None, description="Full Place records for places that reference this object.")
+    source: Optional[List[Any]] = Field(None, description="Full Source records for sources that reference this object.")
+    citation: Optional[List[Any]] = Field(None, description="Full Citation records for citations that reference this object.")
+    media: Optional[List[Any]] = Field(None, description="Full Media records for media items that reference this object.")
